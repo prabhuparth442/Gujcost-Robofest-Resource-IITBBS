@@ -1,4 +1,4 @@
-[Live Demo](https://prabhuparth442.github.io/Gujcost-Robofest-Resource-IITBBS/index.html)
+[Progress Map for Tracking](https://prabhuparth442.github.io/Gujcost-Robofest-Resource-IITBBS/index.html)
 
 
 # 🛩️ Aerial Robotics – Minefield Navigation Challenge Resources
