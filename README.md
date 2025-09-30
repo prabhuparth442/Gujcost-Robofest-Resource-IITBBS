@@ -1,3 +1,6 @@
+[Live Demo](https://prabhuparth442.github.io/Gujcost-Robofest-Resource-IITBBS/index.html)
+
+
 # 🛩️ Aerial Robotics – Minefield Navigation Challenge Resources
 
 This repository contains **curated open-access papers, articles, and tutorials** to support the ideation stage for the Gujcost Robofest **Aerial Robotics: Minefield Navigation Challenge**.
