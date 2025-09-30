@@ -1,0 +1,1425 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Robofest Swarm Project Roadmap</title>
+  <style>
+    :root {
+      --bg-gradient: linear-gradient(135deg, #eef1f9 0%, #f7f9ff 100%);
+      --text-primary: #1d2340;
+      --text-secondary: #4e5d7a;
+      --card-surface: #ffffffc9;
+      --border-soft: rgba(115, 135, 173, 0.18);
+      --shadow-soft: 0 18px 35px rgba(20, 36, 76, 0.11);
+      --modal-shadow: 0 38px 70px rgba(20, 36, 76, 0.18);
+      --transition: 180ms cubic-bezier(0.4, 0, 0.2, 1);
+      --accent-default: #4b6bd6;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      background: var(--bg-gradient);
+      color: var(--text-primary);
+      min-height: 100vh;
+    }
+
+    header {
+      padding: 36px 48px 12px;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 2.4rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    header p {
+      margin: 12px 0 0;
+      color: var(--text-secondary);
+      max-width: 720px;
+      font-size: 1rem;
+    }
+
+    main {
+      padding: 0 48px 64px;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px 18px;
+      margin-top: 24px;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      background: rgba(255, 255, 255, 0.65);
+      border-radius: 999px;
+      border: 1px solid var(--border-soft);
+      font-size: 0.88rem;
+      color: var(--text-secondary);
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .flow-wrapper {
+      margin-top: 40px;
+      position: relative;
+    }
+
+    .flow-container {
+      display: flex;
+      gap: 24px;
+      overflow-x: auto;
+      padding: 12px 0 20px;
+      scroll-snap-type: x mandatory;
+    }
+
+    .flow-container::-webkit-scrollbar {
+      height: 8px;
+    }
+
+    .flow-container::-webkit-scrollbar-thumb {
+      background: rgba(75, 107, 214, 0.35);
+      border-radius: 999px;
+    }
+
+    .lane,
+    .lane-group {
+      scroll-snap-align: start;
+    }
+
+    .lane {
+      --lane-line: rgba(75, 107, 214, 0.18);
+      flex: 0 0 270px;
+      background: rgba(255, 255, 255, 0.82);
+      border: 1px solid var(--border-soft);
+      border-radius: 22px;
+      padding: 26px 22px 28px;
+      position: relative;
+      box-shadow: var(--shadow-soft);
+      backdrop-filter: blur(12px);
+    }
+
+    .lane::before {
+      content: "";
+      position: absolute;
+      top: 94px;
+      bottom: 32px;
+      left: 36px;
+      width: 2px;
+      background: var(--lane-line);
+    }
+
+    .lane[data-theme="start"] {
+      background: rgba(219, 241, 227, 0.82);
+    }
+
+    .lane[data-theme="gate"] {
+      background: rgba(255, 245, 221, 0.9);
+    }
+
+    .lane[data-theme="final"] {
+      background: rgba(255, 228, 228, 0.9);
+    }
+
+    .lane-header {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 18px;
+    }
+
+    .lane-title {
+      font-size: 1.18rem;
+      font-weight: 600;
+      line-height: 1.25;
+    }
+
+    .lane-subtitle {
+      font-size: 0.88rem;
+      color: var(--text-secondary);
+    }
+
+    .lane-badge {
+      align-self: flex-start;
+      margin-bottom: 6px;
+      padding: 6px 12px;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      border-radius: 999px;
+      background: rgba(75, 107, 214, 0.12);
+      color: var(--accent-default);
+      font-weight: 600;
+    }
+
+    .node-card {
+      position: relative;
+      background: rgba(241, 244, 253, 0.92);
+      border-radius: 16px;
+      padding: 18px 18px 18px 62px;
+      margin-top: 18px;
+      color: var(--text-primary);
+      border: 1px solid rgba(75, 107, 214, 0.16);
+      box-shadow: 0 12px 24px rgba(20, 36, 76, 0.08);
+      transition: transform var(--transition), box-shadow var(--transition);
+      cursor: default;
+    }
+
+    .node-card.clickable {
+      cursor: pointer;
+    }
+
+    .node-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 16px 28px rgba(20, 36, 76, 0.12);
+    }
+
+    .node-card::before {
+      content: attr(data-code);
+      position: absolute;
+      left: 18px;
+      top: 16px;
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      background: var(--accent-default);
+      color: white;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.4);
+    }
+
+    .node-card::after {
+      content: "";
+      position: absolute;
+      left: 34px;
+      top: 50px;
+      bottom: -28px;
+      width: 2px;
+      background: var(--lane-line);
+    }
+
+    .node-card.is-last::after {
+      content: none;
+    }
+
+    .node-title {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .node-subtitle {
+      margin: 4px 0 0;
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      line-height: 1.4;
+    }
+
+    .lane[data-theme="start"] .node-card,
+    .lane[data-theme="start"] .lane-badge {
+      background: rgba(231, 246, 235, 0.92);
+      color: #23613e;
+      border-color: rgba(35, 97, 62, 0.2);
+    }
+
+    .lane[data-theme="start"] .node-card::before {
+      background: #35a36d;
+    }
+
+    .lane[data-theme="gate"] .node-card,
+    .lane[data-theme="gate"] .lane-badge {
+      background: rgba(255, 248, 233, 0.96);
+      color: #8a6400;
+      border-color: rgba(181, 130, 14, 0.25);
+    }
+
+    .lane[data-theme="gate"] .node-card::before {
+      background: #f0a600;
+    }
+
+    .lane[data-theme="final"] .node-card,
+    .lane[data-theme="final"] .lane-badge {
+      background: rgba(255, 237, 237, 0.96);
+      color: #9c2d2d;
+      border-color: rgba(219, 90, 90, 0.3);
+    }
+
+    .lane[data-theme="final"] .node-card::before {
+      background: #f36a6a;
+    }
+
+    .lane-group {
+      display: flex;
+      gap: 22px;
+      position: relative;
+      flex-shrink: 0;
+      flex: 0 0 auto;
+      width: max-content;
+    }
+
+    .lane-group-label {
+      position: absolute;
+      top: -32px;
+      left: 0;
+      font-size: 0.9rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(45, 57, 88, 0.62);
+    }
+
+    .lane[data-theme="track-hw"] {
+      background: rgba(255, 242, 231, 0.9);
+    }
+
+    .lane[data-theme="track-sw"] {
+      background: rgba(234, 244, 255, 0.92);
+    }
+
+    .lane[data-theme="track-int"] {
+      background: rgba(234, 250, 246, 0.92);
+    }
+
+    .lane[data-theme="track-hw"] .node-card::before {
+      background: #f08c2f;
+    }
+
+    .lane[data-theme="track-sw"] .node-card::before {
+      background: #2f7df0;
+    }
+
+    .lane[data-theme="track-int"] .node-card::before {
+      background: #0fa77a;
+    }
+
+    .lane[data-theme="milestone"] {
+      background: rgba(238, 243, 255, 0.92);
+    }
+
+    .lane[data-theme="milestone"] .node-card::before {
+      background: #586de0;
+    }
+
+    .lane[data-theme="milestone"] .lane-badge {
+      background: rgba(88, 109, 224, 0.14);
+      color: #586de0;
+    }
+
+    .callout {
+      margin-top: 22px;
+      padding: 18px 20px;
+      border-radius: 16px;
+      background: rgba(240, 244, 252, 0.92);
+      border: 1px dashed rgba(75, 107, 214, 0.28);
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    .modal[hidden] {
+      display: none;
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      z-index: 999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(24, 36, 68, 0.42);
+      backdrop-filter: blur(6px);
+    }
+
+    .modal-dialog {
+      position: relative;
+      width: min(560px, 90vw);
+      max-height: 82vh;
+      background: #ffffff;
+      border-radius: 22px;
+      box-shadow: var(--modal-shadow);
+      padding: 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      overflow: hidden;
+    }
+
+    .modal-header {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .modal-code {
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: #4b6bd6;
+    }
+
+    .modal-title {
+      margin: 0;
+      font-size: 1.32rem;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .modal-subtitle {
+      margin: 0;
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 18px;
+      right: 18px;
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      border: 1px solid rgba(75, 107, 214, 0.18);
+      background: white;
+      color: var(--text-secondary);
+      font-size: 1.2rem;
+      cursor: pointer;
+      transition: background var(--transition), transform var(--transition);
+    }
+
+    .modal-close:hover {
+      background: rgba(75, 107, 214, 0.08);
+      transform: rotate(90deg);
+    }
+
+    .requirements-heading {
+      margin: 12px 0 0;
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .requirements-list {
+      margin: 6px 0 0;
+      padding-left: 22px;
+      color: var(--text-secondary);
+      line-height: 1.55;
+      font-size: 0.95rem;
+    }
+
+    .footer-note {
+      margin-top: 48px;
+      font-size: 0.86rem;
+      color: rgba(40, 52, 78, 0.66);
+    }
+
+    @media (max-width: 900px) {
+      header,
+      main {
+        padding-left: 24px;
+        padding-right: 24px;
+      }
+
+      .lane {
+        flex: 0 0 240px;
+      }
+
+      .lane::before {
+        left: 32px;
+      }
+
+      .node-card::before {
+        left: 16px;
+      }
+
+      .node-card::after {
+        left: 30px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Robofest Swarm Project Roadmap</h1>
+    <p>Interactive view of the multi-phase development plan for the Robofest VibeCoding Structure project. Click any milestone to explore detailed deliverables, tests, and success criteria.</p>
+    <div class="legend">
+      <div class="legend-item"><span class="legend-dot" style="background:#35a36d"></span> Project Start</div>
+      <div class="legend-item"><span class="legend-dot" style="background:#4b6bd6"></span> Core Phase</div>
+      <div class="legend-item"><span class="legend-dot" style="background:#f08c2f"></span> Hardware Track</div>
+      <div class="legend-item"><span class="legend-dot" style="background:#2f7df0"></span> Software Track</div>
+      <div class="legend-item"><span class="legend-dot" style="background:#0fa77a"></span> Integration Track</div>
+      <div class="legend-item"><span class="legend-dot" style="background:#f0a600"></span> Stage Gate</div>
+      <div class="legend-item"><span class="legend-dot" style="background:#f36a6a"></span> Final Prep</div>
+    </div>
+  </header>
+  <main>
+    <section class="flow-wrapper">
+      <div class="flow-container" id="flowContainer"></div>
+    </section>
+    <p class="footer-note">Tip: Scroll horizontally to follow the timeline from ideation through competition day. Milestones with requirement details glow as you hover.</p>
+  </main>
+
+  <div class="modal" data-modal hidden>
+    <div class="modal-overlay" data-close></div>
+    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <button class="modal-close" type="button" data-close aria-label="Close">×</button>
+      <div class="modal-header">
+        <span class="modal-code" id="modalCode"></span>
+        <h2 class="modal-title" id="modalTitle"></h2>
+        <p class="modal-subtitle" id="modalSubtitle"></p>
+        <p class="requirements-heading" id="modalReqHeading"></p>
+      </div>
+      <ul class="requirements-list" id="modalRequirements"></ul>
+    </div>
+  </div>
+
+  <script>
+    const req = (heading, items) => ({ heading, items });
+
+    const flowLayout = [];
+
+    function createLane(lane) {
+      const laneEl = document.createElement('div');
+      laneEl.className = 'lane';
+      laneEl.dataset.theme = lane.theme || 'default';
+      if (lane.accent) {
+        laneEl.style.setProperty('--accent-default', lane.accent);
+      }
+
+      if (lane.badge) {
+        const badge = document.createElement('div');
+        badge.className = 'lane-badge';
+        badge.textContent = lane.badge;
+        laneEl.appendChild(badge);
+      }
+
+      const header = document.createElement('div');
+      header.className = 'lane-header';
+      const title = document.createElement('div');
+      title.className = 'lane-title';
+      title.textContent = lane.title;
+      header.appendChild(title);
+      if (lane.subtitle) {
+        const subtitle = document.createElement('div');
+        subtitle.className = 'lane-subtitle';
+        subtitle.textContent = lane.subtitle;
+        header.appendChild(subtitle);
+      }
+      laneEl.appendChild(header);
+
+      const nodes = lane.nodes || [];
+      nodes.forEach((node, index) => {
+        const nodeEl = document.createElement('div');
+        nodeEl.className = 'node-card';
+        if (index === nodes.length - 1) {
+          nodeEl.classList.add('is-last');
+        }
+        nodeEl.dataset.code = node.code || '';
+        if (node.requirements) {
+          nodeEl.classList.add('clickable');
+          nodeEl.addEventListener('click', () => openModal(node));
+        }
+
+        const nodeTitle = document.createElement('h3');
+        nodeTitle.className = 'node-title';
+        nodeTitle.textContent = node.title;
+        nodeEl.appendChild(nodeTitle);
+
+        if (node.subtitle) {
+          const nodeSubtitle = document.createElement('p');
+          nodeSubtitle.className = 'node-subtitle';
+          nodeSubtitle.textContent = node.subtitle;
+          nodeEl.appendChild(nodeSubtitle);
+        }
+
+        if (node.note) {
+          const note = document.createElement('div');
+          note.className = 'callout';
+          note.textContent = node.note;
+          nodeEl.appendChild(note);
+        }
+
+        laneEl.appendChild(nodeEl);
+      });
+
+      return laneEl;
+    }
+
+    function renderFlow(data) {
+      const container = document.getElementById('flowContainer');
+      container.innerHTML = '';
+
+      data.forEach(section => {
+        if (section.type === 'group') {
+          const wrapper = document.createElement('div');
+          wrapper.className = 'lane-group';
+          if (section.label) {
+            const label = document.createElement('div');
+            label.className = 'lane-group-label';
+            label.textContent = section.label;
+            wrapper.appendChild(label);
+          }
+          section.lanes.forEach(lane => wrapper.appendChild(createLane(lane)));
+          container.appendChild(wrapper);
+        } else {
+          container.appendChild(createLane(section.lane));
+        }
+      });
+    }
+
+    function openModal(node) {
+      const modal = document.querySelector('[data-modal]');
+      const list = document.getElementById('modalRequirements');
+      document.getElementById('modalCode').textContent = node.code || '';
+      document.getElementById('modalTitle').textContent = node.title || '';
+      document.getElementById('modalSubtitle').textContent = node.subtitle || '';
+      document.getElementById('modalReqHeading').textContent = node.requirements?.heading || '';
+      list.innerHTML = '';
+      if (node.requirements?.items) {
+        node.requirements.items.forEach(item => {
+          const li = document.createElement('li');
+          li.textContent = item;
+          list.appendChild(li);
+        });
+      }
+      modal.hidden = false;
+      modal.dataset.open = 'true';
+    }
+
+    function closeModal() {
+      const modal = document.querySelector('[data-modal]');
+      if (modal) {
+        modal.hidden = true;
+        modal.removeAttribute('data-open');
+      }
+    }
+
+    document.querySelectorAll('[data-close]').forEach(btn => btn.addEventListener('click', closeModal));
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape') {
+        closeModal();
+      }
+    });
+
+    flowLayout.push({
+      type: "single",
+      lane: {
+        theme: "start",
+        badge: "Initiate",
+        accent: "#35a36d",
+        lineColor: "rgba(53, 163, 109, 0.25)",
+        title: "Project Start",
+        subtitle: "Ideation Phase",
+        nodes: [
+          {
+            code: "START",
+            title: "Project Start",
+            subtitle: "Ideation Phase"
+          }
+        ]
+      }
+    });
+
+    flowLayout.push({
+      type: "single",
+      lane: {
+        theme: "milestone",
+        badge: "Phase 1",
+        accent: "#4b6bd6",
+        lineColor: "rgba(75, 107, 214, 0.25)",
+        title: "Phase 1: Foundation",
+        subtitle: "Aug - Sep 2025",
+        nodes: [
+          {
+            code: "A1",
+            title: "Ideation Report",
+            subtitle: "CAD Models and Specs",
+            requirements: req("Deliverables", [
+              "Complete CAD models (two designs)",
+              "Compile component list with weights",
+              "Document system specifications",
+              "Write abstract and novelty analysis",
+              "Estimate budget at INR 2.5L"
+            ])
+          },
+          {
+            code: "A2",
+            title: "Literature Study",
+            subtitle: "Algorithm Research",
+            requirements: req("Research Needed", [
+              "Research mine detection algorithms",
+              "Review swarm coordination papers",
+              "Study ORCA collision avoidance",
+              "Examine D* Lite path planning",
+              "Compare gesture recognition methods"
+            ])
+          },
+          {
+            code: "A3",
+            title: "Simulation Setup",
+            subtitle: "Gazebo and PySim Environment",
+            requirements: req("Setup Tasks", [
+              "Install Gazebo and ROS2",
+              "Create 100x20 m arena model",
+              "Add mine and pole objects",
+              "Configure four-drone simulation",
+              "Verify basic physics behavior"
+            ])
+          },
+          {
+            code: "A4",
+            title: "Algorithm Prototypes",
+            subtitle: "Detection, Mapping, Planning",
+            requirements: req("Prototypes Needed", [
+              "Prototype circle detection",
+              "Build log-odds grid fusion test",
+              "Draft formation controller",
+              "Implement simple path planner",
+              "Validate with sample data"
+            ])
+          }
+        ]
+      }
+    });
+
+    flowLayout.push({
+      type: "group",
+      label: "Parallel Development Tracks",
+      lanes: [
+        {
+          theme: "track-hw",
+          badge: "Hardware Track",
+          accent: "#f08c2f",
+          lineColor: "rgba(240, 140, 47, 0.25)",
+          title: "Hardware Development",
+          subtitle: "Sep - Nov 2025",
+          nodes: [
+            {
+              code: "H1",
+              title: "Component Procurement",
+              subtitle: "Motors, ESC, Cameras, Sensors",
+              requirements: req("Purchase List", [
+                "Order 4 carbon fiber frames",
+                "Order 16 1507 brushless motors",
+                "Order 4 20A 4-in-1 ESC",
+                "Order 4 3S LiPo 2200 mAh batteries",
+                "Order 4 Arducam AR0234 cameras",
+                "Order 4 Pixhawk 6C Mini controllers",
+                "Order 4 Raspberry Pi 4 units",
+                "Order 4 UWB modules",
+                "Source LED arrays and microphones"
+              ])
+            },
+            {
+              code: "H2",
+              title: "PoC Drone Assembly",
+              subtitle: "20x20x4 cm Frame",
+              requirements: req("Assembly Tasks", [
+                "Mount motors to frame",
+                "Install ESC and power distribution",
+                "Secure battery bay",
+                "Mount camera at 25 deg angle",
+                "Verify weight <= 480 g",
+                "Balance propellers"
+              ])
+            },
+            {
+              code: "H3",
+              title: "Flight Controller Setup",
+              subtitle: "Pixhawk Configuration",
+              requirements: req("Configuration", [
+                "Flash ArduPilot firmware",
+                "Tune PID for stability",
+                "Configure geofence safeguards",
+                "Set failsafe modes",
+                "Connect ROS2 bridge",
+                "Enable GPS-denied mode"
+              ])
+            },
+            {
+              code: "H4",
+              title: "Sensor Calibration",
+              subtitle: "Camera Intrinsics, IMU",
+              requirements: req("Calibration", [
+                "Calibrate camera intrinsics",
+                "Calibrate IMU accelerometer, gyro, magnetometer",
+                "Set barometer altitude offset",
+                "Validate ToF sensor accuracy",
+                "Solve camera-to-body extrinsics",
+                "Verify homography math"
+              ])
+            },
+            {
+              code: "H5",
+              title: "Basic Flight Tests",
+              subtitle: "Stability and Endurance",
+              requirements: req("Flight Tests", [
+                "Check hover stability within +/- 0.2 m",
+                "Verify altitude hold accuracy",
+                "Achieve 10-12 min endurance",
+                "Test wind resistance",
+                "Exercise emergency land procedure",
+                "Monitor battery voltage"
+              ])
+            },
+            {
+              code: "H6",
+              title: "LED and Audio System",
+              subtitle: "Feedback Mechanisms",
+              requirements: req("Feedback System", [
+                "Install top and bottom RGB LEDs",
+                "Wire directional microphone",
+                "Program LED patterns (green, amber, red)",
+                "Select beep frequency set",
+                "Filter audio against rotor noise",
+                "Verify outdoor visibility"
+              ])
+            }
+          ]
+        },
+        {
+          theme: "track-sw",
+          badge: "Software Track",
+          accent: "#2f7df0",
+          lineColor: "rgba(47, 125, 240, 0.25)",
+          title: "Software Development",
+          subtitle: "Sep - Nov 2025",
+          nodes: [
+            {
+              code: "S1",
+              title: "Detection Pipeline",
+              subtitle: "CV plus Lightweight CNN",
+              requirements: req("Detection Module", [
+                "Implement image preprocessing",
+                "Add Hough circle detection",
+                "Train tiny CNN for 40-60 cm discs",
+                "Filter poles by aspect ratio",
+                "Maintain 10-15 FPS throughput",
+                "Set confidence threshold >= 60%"
+              ])
+            },
+            {
+              code: "S2",
+              title: "Multi-Drone Confirmation",
+              subtitle: "Temporal and Cross-View Logic",
+              requirements: req("Confirmation Logic", [
+                "Require >= 3 frames within 2 s",
+                "Demand >= 2 drones confirm within 25 cm",
+                "Maintain timestamp synchronization",
+                "Project detections to global coordinates",
+                "Reject shadows and rocks",
+                "Log every detection event"
+              ])
+            },
+            {
+              code: "S3",
+              title: "Log-Odds Mapping",
+              subtitle: "Probabilistic Fusion",
+              requirements: req("Mapping System", [
+                "Use 0.15-0.20 m grid resolution",
+                "Apply log-odds update (+1.1 and -1.4)",
+                "Clamp occupancy range between -4 and +4",
+                "Inflate detection to 1.2 m lethal disk",
+                "Add 2 m Gaussian soft halo",
+                "Enforce two-clears rule before freeing"
+              ])
+            },
+            {
+              code: "S4",
+              title: "Path Planning",
+              subtitle: "D* Lite plus Elastic Band",
+              requirements: req("Path Planner", [
+                "Implement D* Lite algorithm",
+                "Add elastic band smoothing",
+                "Limit curvature to <= 0.3 rad per meter",
+                "Widen corridor to 2.5-3.0 m",
+                "Validate minimum 1.2 m clearance",
+                "Replan in <= 1 s"
+              ])
+            },
+            {
+              code: "S5",
+              title: "Gesture Recognition",
+              subtitle: "Pose Estimation Pipeline",
+              requirements: req("Gesture System", [
+                "Integrate MediaPipe pose estimation",
+                "Support STOP, HOLD, FORWARD gestures",
+                "Add 0.6-1.0 s dwell timer",
+                "Prioritize STOP under 200 ms",
+                "Maintain 15 FPS processing",
+                "Filter false positives"
+              ])
+            },
+            {
+              code: "S6",
+              title: "Voice Recognition",
+              subtitle: "Keyword Spotting",
+              requirements: req("Voice System", [
+                "Detect Stop, Forward, Hold keywords",
+                "Implement wind and rotor noise filtering",
+                "Use directional microphone focus",
+                "Keep normal latency < 350 ms",
+                "Ensure STOP and ABORT < 200 ms",
+                "Set confidence threshold at 70%"
+              ])
+            },
+            {
+              code: "S7",
+              title: "Swarm Coordination",
+              subtitle: "Formation Control plus ORCA",
+              requirements: req("Coordination", [
+                "Support diamond and lane formations",
+                "Maintain 40% camera sidelap",
+                "Run ORCA at 20 Hz",
+                "Keep 3 m inter-drone spacing",
+                "Guarantee 2 m human safety bubble",
+                "Target speed 1.2-2.0 m/s"
+              ])
+            },
+            {
+              code: "S8",
+              title: "Failover Protocols",
+              subtitle: "Leader Election plus Epoch",
+              requirements: req("Failover Logic", [
+                "Assign roles master, overwatch, scanners",
+                "Increment epoch counter on change",
+                "Complete leader election in < 2 s",
+                "Monitor heartbeat status",
+                "Reject stale commands",
+                "Define formation degradation rules"
+              ])
+            }
+          ]
+        },
+        {
+          theme: "track-int",
+          badge: "Integration Track",
+          accent: "#0fa77a",
+          lineColor: "rgba(15, 167, 122, 0.24)",
+          title: "Integration",
+          subtitle: "Oct - Nov 2025",
+          nodes: [
+            {
+              code: "I1",
+              title: "Communication Network",
+              subtitle: "5 GHz Mesh plus UWB",
+              requirements: req("Network Setup", [
+                "Stand up 5 GHz ad-hoc mesh",
+                "Implement UDP broadcast protocol",
+                "Stay under 10 Mbps bandwidth",
+                "Handle packet loss gracefully",
+                "Integrate UWB relative positioning",
+                "Target 10 cm accuracy"
+              ])
+            },
+            {
+              code: "I2",
+              title: "Time Synchronization",
+              subtitle: "Master Clock Setup",
+              requirements: req("Time Sync", [
+                "Use master node as clock source",
+                "Build NTP-like sync protocol",
+                "Hold drift <= 10 ms",
+                "Timestamp every message",
+                "Detect clock jumps",
+                "Trigger resync on failure"
+              ])
+            },
+            {
+              code: "I3",
+              title: "Data Fusion Layer",
+              subtitle: "Tile Sharing Protocol",
+              requirements: req("Data Fusion", [
+                "Add map tile versioning",
+                "Update tiles at 2-5 Hz",
+                "Share poses within 50 ms",
+                "Prioritize safety messages",
+                "Compress tile data",
+                "Handle partial updates"
+              ])
+            },
+            {
+              code: "I4",
+              title: "Command Arbitration",
+              subtitle: "Safety > Gesture > Voice",
+              requirements: req("Arbitration", [
+                "Ensure safety commands take priority",
+                "Prefer gestures over voice for non-safety",
+                "Request confirmation on ambiguous input",
+                "Bypass queues for STOP commands",
+                "Log every arbitration decision",
+                "Provide user feedback on rejection"
+              ])
+            },
+            {
+              code: "I5",
+              title: "Corridor Rendering",
+              subtitle: "Lane Marking Logic",
+              requirements: req("Lane Rendering", [
+                "Project master beacon 3-5 m ahead",
+                "Mark corridor edges on flank drones",
+                "Map LED colors to safe, wait, stop",
+                "Optionally support ground projection",
+                "Smooth transitions at <= 0.5 m/s",
+                "Rate-limit replans"
+              ])
+            }
+          ]
+        }
+      ]
+    });
+
+    flowLayout.push({
+      type: "single",
+      lane: {
+        theme: "milestone",
+        badge: "Testing",
+        accent: "#586de0",
+        lineColor: "rgba(88, 109, 224, 0.24)",
+        title: "PoC Testing and Validation",
+        subtitle: "Nov 2025",
+        nodes: [
+          {
+            code: "T1",
+            title: "Single Drone Tests",
+            subtitle: "Detection and Flight",
+            requirements: req("Single Drone", [
+              "Detect mock mines",
+              "Maintain stable hover with camera",
+              "Map individual objects",
+              "Verify LED and beep feedback",
+              "Retain manual control fallback",
+              "Log flight data"
+            ])
+          },
+          {
+            code: "T2",
+            title: "Swarm Communication",
+            subtitle: "Two-Drone Tests",
+            requirements: req("Two-Drone Test", [
+              "Stabilize mesh network",
+              "Share detections between drones",
+              "Verify time synchronization",
+              "Confirm cross-view detection",
+              "Keep collision avoidance active",
+              "Check pose accuracy"
+            ])
+          },
+          {
+            code: "T3",
+            title: "Formation Flying",
+            subtitle: "3-4 Drone Coordination",
+            requirements: req("Formation", [
+              "Maintain diamond formation",
+              "Verify sidelap coverage",
+              "Control formation speed",
+              "Simulate failover",
+              "Replace exiting drone",
+              "Measure inter-drone comms load"
+            ])
+          },
+          {
+            code: "T4",
+            title: "Detection Validation",
+            subtitle: ">= 95% Accuracy Target",
+            requirements: req("Detection Metrics", [
+              "Test with 20 mock mines",
+              "Track true positives, false positives, false negatives",
+              "Reach precision >= 95%",
+              "Reach recall >= 95%",
+              "Validate pole discrimination",
+              "Audit lighting variations"
+            ])
+          },
+          {
+            code: "T5",
+            title: "Arena Dry Runs",
+            subtitle: "Scaled Test Field",
+            requirements: req("Arena Tests", [
+              "Prepare 40x10 m scaled field",
+              "Deploy 10-15 test mines",
+              "Conduct human corridor walk",
+              "Exercise gesture commands",
+              "Complete end-to-end mission",
+              "Finish in < 5 min scaled time"
+            ])
+          },
+          {
+            code: "T6",
+            title: "PoC Documentation",
+            subtitle: "Report and Video Demo",
+            requirements: req("PoC Deliverable", [
+              "Compile technical report",
+              "Package CAD and test results",
+              "Produce video demonstration",
+              "Chart detection metrics",
+              "Summarize lessons learned",
+              "Submit by 25 Nov"
+            ])
+          }
+        ]
+      }
+    });
+
+    flowLayout.push({
+      type: "single",
+      lane: {
+        theme: "gate",
+        badge: "Gate",
+        accent: "#f0a600",
+        lineColor: "rgba(240, 166, 0, 0.26)",
+        title: "PoC Submission",
+        subtitle: "25 Nov 2025",
+        nodes: [
+          {
+            code: "GATE1",
+            title: "PoC Submission",
+            subtitle: "25 Nov 2025",
+            note: "Submit final PoC package once testing deliverables are complete."
+          }
+        ]
+      }
+    });
+
+    flowLayout.push({
+      type: "single",
+      lane: {
+        theme: "milestone",
+        badge: "Phase 2",
+        accent: "#4b6bd6",
+        lineColor: "rgba(75, 107, 214, 0.25)",
+        title: "Phase 2: Prototype Build",
+        subtitle: "Dec 2025 - Jan 2026",
+        nodes: [
+          {
+            code: "P1",
+            title: "Prototype Drone Build",
+            subtitle: "23x23x5 cm, Enhanced Sensors",
+            requirements: req("Prototype Build", [
+              "Scale frame to 23x23x5 cm",
+              "Upgrade motors as needed",
+              "Keep weight <= 500 g",
+              "Improve mounting approach",
+              "Refine cable management",
+              "Design modular sensor bay"
+            ])
+          },
+          {
+            code: "P2",
+            title: "RGB plus NIR/Depth Integration",
+            subtitle: "Dual Modality",
+            requirements: req("Dual Sensing", [
+              "Add NIR or polarization camera",
+              "Equip overwatch drone only",
+              "Synchronize RGB and auxiliary feeds",
+              "Quantify confirmation boost",
+              "Evaluate optional depth sensor",
+              "Enhance pole discrimination logic"
+            ])
+          },
+          {
+            code: "P3",
+            title: "UWB Positioning",
+            subtitle: "10 cm Accuracy Setup",
+            requirements: req("UWB System", [
+              "Install DWM1000 modules",
+              "Calibrate for 10 cm accuracy",
+              "Operate with relative positioning",
+              "Maintain 5-10 Hz updates",
+              "Integrate with ORCA",
+              "Pilot indoors first"
+            ])
+          },
+          {
+            code: "P4",
+            title: "Advanced Failover",
+            subtitle: "Full K-of-N Logic",
+            requirements: req("K-of-N Logic", [
+              "Accept detection when K of N drones agree",
+              "Start with N = 4",
+              "Track active drone count",
+              "Define formation narrowing rules",
+              "Require minimum two scanners",
+              "Plan graceful mission abort"
+            ])
+          },
+          {
+            code: "P5",
+            title: "Battery Optimization",
+            subtitle: "10-12 Min Endurance",
+            requirements: req("Optimization", [
+              "Test multiple battery types",
+              "Balance weight versus capacity",
+              "Optimize flight profile",
+              "Target 10-12 min mission",
+              "Warn on low battery",
+              "Auto-return below 20% charge"
+            ])
+          }
+        ]
+      }
+    });
+
+    flowLayout.push({
+      type: "single",
+      lane: {
+        theme: "milestone",
+        badge: "Phase 3",
+        accent: "#4b6bd6",
+        lineColor: "rgba(75, 107, 214, 0.25)",
+        title: "Phase 3: System Validation",
+        subtitle: "Jan - Feb 2026",
+        nodes: [
+          {
+            code: "V1",
+            title: "100x20 m Arena Setup",
+            subtitle: "Full Mission Simulation",
+            requirements: req("Full Arena", [
+              "Lay out 100x20 m field",
+              "Place 30-40 test mines",
+              "Add 10-15 pole obstacles",
+              "Mark start and exit zones",
+              "Prepare camera and video capture",
+              "Establish safety perimeter"
+            ])
+          },
+          {
+            code: "V2",
+            title: "Detection Performance",
+            subtitle: "Mine and Pole Discrimination",
+            requirements: req("Detection Test", [
+              "Measure precision and recall",
+              "Meet >= 95% on both metrics",
+              "Test under varied lighting",
+              "Verify pole filtering",
+              "Check false positives",
+              "Document failures"
+            ])
+          },
+          {
+            code: "V3",
+            title: "Corridor Generation",
+            subtitle: "1.2 m Clearance Validation",
+            requirements: req("Corridor Test", [
+              "Confirm minimum 1.2 m clearance",
+              "Maintain 2.5-3.0 m corridor width",
+              "Trial 10 random layouts",
+              "Detect no-path situations",
+              "Measure planning time",
+              "Collect user comfort feedback"
+            ])
+          },
+          {
+            code: "V4",
+            title: "Dynamic Replanning",
+            subtitle: "<= 1 s Latency Tests",
+            requirements: req("Replan Test", [
+              "Introduce obstacle mid-mission",
+              "Log replan latency",
+              "Hit <= 1.0 s target",
+              "Test response to user drift",
+              "Verify smooth transitions",
+              "Eliminate jitter"
+            ])
+          },
+          {
+            code: "V5",
+            title: "Human-Swarm Interaction",
+            subtitle: "Gesture, Voice, Feedback",
+            requirements: req("HRI Validation", [
+              "Test all gesture commands",
+              "Test all voice commands",
+              "Ensure STOP response < 200 ms",
+              "Confirm LED visibility at 20 m",
+              "Verify beep audibility",
+              "Check user feedback clarity"
+            ])
+          },
+          {
+            code: "V6",
+            title: "Stress Testing",
+            subtitle: "Failures, Low Battery, Comms Loss",
+            requirements: req("Stress Scenarios", [
+              "Simulate master failure mid-flight",
+              "Trigger low battery scenarios",
+              "Interrupt mesh network",
+              "Remove two drones",
+              "Validate safety bubble",
+              "Exercise emergency landing"
+            ])
+          },
+          {
+            code: "V7",
+            title: "Endurance and Speed",
+            subtitle: "Full Mission < 10 Min",
+            requirements: req("Mission Timing", [
+              "Complete full 100 m traverse",
+              "Finish mission under 10 min",
+              "Include escort phase",
+              "Measure battery usage",
+              "Verify landing sequence",
+              "Repeat at least five runs"
+            ])
+          }
+        ]
+      }
+    });
+
+    flowLayout.push({
+      type: "single",
+      lane: {
+        theme: "gate",
+        badge: "Gate",
+        accent: "#f0a600",
+        lineColor: "rgba(240, 166, 0, 0.26)",
+        title: "Prototype Submission",
+        subtitle: "10 Feb 2026",
+        nodes: [
+          {
+            code: "GATE2",
+            title: "Prototype Submission",
+            subtitle: "10 Feb 2026",
+            note: "Freeze prototype build and upload competition deliverables."
+          }
+        ]
+      }
+    });
+
+    flowLayout.push({
+      type: "single",
+      lane: {
+        theme: "final",
+        badge: "Final Prep",
+        accent: "#f36a6a",
+        lineColor: "rgba(243, 106, 106, 0.24)",
+        title: "Competition Prep",
+        subtitle: "Feb 2026",
+        nodes: [
+          {
+            code: "F1",
+            title: "Final Stress Tests",
+            subtitle: "Safety Validation",
+            requirements: req("Final Safety", [
+              "Re-verify all failsafes",
+              "Test human safety bubble",
+              "Check collision avoidance",
+              "Confirm emergency stop reliability",
+              "Validate comms loss behavior",
+              "Complete sign-off checklist"
+            ])
+          },
+          {
+            code: "F2",
+            title: "Documentation Polish",
+            subtitle: "Technical Report",
+            requirements: req("Documentation", [
+              "Finalize technical report",
+              "Include all test results",
+              "Update system diagrams",
+              "Detail algorithm explanations",
+              "Prepare video demonstrations",
+              "Submit ahead of deadline"
+            ])
+          },
+          {
+            code: "F3",
+            title: "Presentation and Posters",
+            subtitle: "Visual Materials",
+            requirements: req("Presentation", [
+              "Craft slide deck",
+              "Design poster (A0 or A1)",
+              "Write demo script",
+              "Highlight novelty factors",
+              "Practice timing",
+              "Prepare backup slides"
+            ])
+          },
+          {
+            code: "F4",
+            title: "Demo Rehearsals",
+            subtitle: "Mock Q&A Sessions",
+            requirements: req("Rehearsal", [
+              "Run full demo practice",
+              "Time the presentation",
+              "Hold mock questions",
+              "Test backup scenarios",
+              "Record rehearsal video",
+              "Assign team roles"
+            ])
+          },
+          {
+            code: "F5",
+            title: "Equipment Transport",
+            subtitle: "Competition Logistics",
+            requirements: req("Logistics", [
+              "Pack all equipment",
+              "Carry spare parts and batteries",
+              "Include tools and repair kit",
+              "Bring backup drones if any",
+              "Arrange travel logistics",
+              "Confirm insurance coverage"
+            ])
+          }
+        ]
+      }
+    });
+
+    flowLayout.push({
+      type: "single",
+      lane: {
+        theme: "final",
+        badge: "Grand Finale",
+        accent: "#f36a6a",
+        lineColor: "rgba(243, 106, 106, 0.24)",
+        title: "Competition Day",
+        subtitle: "25 - 28 Feb 2026",
+        nodes: [
+          {
+            code: "COMP",
+            title: "Grand Finale",
+            subtitle: "Competition Showcase",
+            requirements: req("Competition Day", [
+              "Complete setup and safety check",
+              "Run full mission demonstration",
+              "Present to judges",
+              "Answer technical questions",
+              "Network with other teams",
+              "Celebrate achievement"
+            ])
+          }
+        ]
+      }
+    });
+
+    renderFlow(flowLayout);
+  </script>
+</body>
+</html>
+
+
