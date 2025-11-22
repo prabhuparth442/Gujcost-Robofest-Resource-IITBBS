@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Detection of Recently Buried Plastic Plates – Disturbed Soil Approach</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --bg: #020617;
+      --bg-alt: #050816;
+      --panel: #020617;
+      --panel-alt: #030711;
+      --accent: #38bdf8;
+      --accent-soft: rgba(56,189,248,0.16);
+      --accent-2: #a855f7;
+      --accent-3: #22c55e;
+      --accent-4: #f97316;
+      --text-main: #e5e7eb;
+      --text-muted: #9ca3af;
+      --border-soft: rgba(148,163,184,0.55);
+      --shadow-soft: 0 18px 45px rgba(15,23,42,0.85);
+      --radius-lg: 18px;
+      --radius-xl: 22px;
+      --transition-fast: 200ms ease-out;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+        "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top, #111827 0, #020617 50%, #000 100%);
+      color: var(--text-main);
+      line-height: 1.6;
+    }
+
+    main {
+      max-width: 1220px;
+      margin: 0 auto;
+      padding: 28px 14px 60px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: clamp(2rem, 1.6rem + 1.2vw, 2.6rem);
+      letter-spacing: 0.04em;
+    }
+
+    header p {
+      margin: 6px 0 0;
+      color: var(--text-muted);
+      font-size: 0.94rem;
+    }
+
+    .tagline {
+      margin-top: 10px;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: var(--accent);
+    }
+
+    /* Block layout */
+    .grid {
+      column-count: 2;
+      column-gap: 18px;
+    }
+
+    @media (max-width: 980px) {
+      .grid {
+        column-count: 1;
+      }
+    }
+
+    .block {
+      break-inside: avoid;
+      -webkit-column-break-inside: avoid;
+      margin: 0 0 18px;
+      background: radial-gradient(circle at top left, #111827 0, #020617 50%);
+      border-radius: var(--radius-xl);
+      border: 1px solid var(--border-soft);
+      box-shadow: var(--shadow-soft);
+      padding: 16px 18px 16px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .block::before {
+      content: "";
+      position: absolute;
+      inset: -70%;
+      background:
+        radial-gradient(circle at top,
+          rgba(56,189,248,0.08) 0, transparent 55%);
+      opacity: 0.7;
+      pointer-events: none;
+    }
+
+    .block-inner {
+      position: relative;
+      z-index: 1;
+    }
+
+    .block-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .block-title {
+      font-size: 1.02rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .block-id {
+      font-size: 0.75rem;
+      padding: 2px 7px;
+      border-radius: 999px;
+      border: 1px solid rgba(148,163,184,0.8);
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.13em;
+    }
+
+    .block-meta {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .block-meta a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .block-meta a:hover {
+      text-decoration: underline;
+    }
+
+    h3 {
+      font-size: 1rem;
+      margin: 12px 0 4px;
+    }
+
+    h4 {
+      font-size: 0.95rem;
+      margin: 10px 0 3px;
+      color: var(--accent);
+    }
+
+    p {
+      margin: 4px 0;
+      font-size: 0.9rem;
+    }
+
+    ul, ol {
+      margin: 4px 0 8px;
+      padding-left: 19px;
+      font-size: 0.87rem;
+    }
+
+    li {
+      margin-bottom: 2px;
+    }
+
+    .muted {
+      color: var(--text-muted);
+      font-size: 0.86rem;
+    }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 6px 0 4px;
+    }
+
+    .pill {
+      font-size: 0.72rem;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(148,163,184,0.5);
+      background: rgba(15,23,42,0.95);
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    code {
+      font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco,
+        Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 0.8rem;
+      padding: 2px 5px;
+      border-radius: 999px;
+      background: rgba(15,23,42,0.98);
+      border: 1px solid rgba(148,163,184,0.6);
+      color: var(--accent);
+    }
+
+    .equation {
+      font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco,
+        Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 0.8rem;
+      background: rgba(15,23,42,0.98);
+      border-radius: 10px;
+      padding: 6px 8px;
+      border: 1px solid rgba(148,163,184,0.6);
+      margin: 6px 0;
+      overflow-x: auto;
+    }
+
+    .diagram-wrapper {
+      margin-top: 8px;
+      border-radius: var(--radius-lg);
+      border: 1px solid rgba(148,163,184,0.55);
+      background:
+        radial-gradient(circle at top, #020617 0, #020617 40%, #000 100%);
+      padding: 9px;
+      overflow-x: auto;
+    }
+
+    .diagram-caption {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+      text-align: center;
+    }
+
+    svg {
+      max-width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 5px;
+      font-size: 0.78rem;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      color: var(--text-muted);
+    }
+
+    .legend-box {
+      width: 13px;
+      height: 13px;
+      border-radius: 4px;
+      border: 1px solid rgba(148,163,184,0.8);
+    }
+
+    .legend-env { background: rgba(56,189,248,0.18); }
+    .legend-drone { background: rgba(168,85,247,0.2); }
+    .legend-master { background: rgba(34,197,94,0.2); }
+    .legend-user { background: rgba(249,115,22,0.18); }
+    .legend-logic { background: rgba(59,130,246,0.2); }
+
+    .note-box {
+      margin-top: 4px;
+      font-size: 0.82rem;
+      padding: 6px 8px;
+      border-radius: 10px;
+      border: 1px dashed rgba(148,163,184,0.7);
+      background: rgba(15,23,42,0.9);
+    }
+
+    .section-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      color: var(--accent);
+      margin-bottom: 2px;
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Detection of Recently Buried Plastic Plates via Disturbed Soil</h1>
+    <p>Information-flow, physical modelling, and sensing feasibility for a 2&nbsp;m-high drone over plastic plates buried at 15&nbsp;cm depth.</p>
+    <div class="tagline">thermal anomaly &bull; disturbed ground &bull; realistic constraints</div>
+  </header>
+
+  <div class="grid">
+
+    <!-- Block A -->
+    <section class="block" id="A-overview">
+      <div class="block-inner">
+        <div class="block-header">
+          <div class="block-title">
+            <span class="block-id">BLOCK A</span>
+            Mission Overview & Context
+          </div>
+        </div>
+        <div class="block-meta">
+          <span class="section-label">Read first.</span>
+          This block sets scenario and constraints used by all later blocks (B–H).
+        </div>
+
+        <h3>Scenario</h3>
+        <ul>
+          <li>Organisers manually bury plastic “mine plates” in a test field, typically a few days before the event.</li>
+          <li>Plates are **plastic**, roughly mine-sized (≈20–25&nbsp;cm diameter), placed with tops at **15&nbsp;cm depth**.</li>
+          <li>After burial, soil is backfilled and visually smoothed so the field **looks almost undisturbed**.</li>
+        </ul>
+
+        <h3>Mission Objective</h3>
+        <p>The drone swarm does <strong>not</strong> need to directly sense plastic; instead it must detect any reliable cues that indicate:</p>
+        <ul>
+          <li>“This patch of ground was recently dug and refilled”, and</li>
+          <li>Patch size is consistent with a mine burial, rather than random footprints or small disturbances.</li>
+        </ul>
+
+        <h3>Key Constraints</h3>
+        <ul>
+          <li>Drone altitude: <strong>2&nbsp;m above ground</strong> during sensing.</li>
+          <li>Budget and weight: hobby-scale micro-UAVs; no heavy military GPR or cooled IR cameras.</li>
+          <li>Burial is **recent** (within days to a few weeks), giving us disturbed-soil signatures to exploit.</li>
+        </ul>
+
+        <h3>High-Level Strategy</h3>
+        <p>Given the depth and material, directly sensing the plate is physically unrealistic from 2&nbsp;m. Instead we:</p>
+        <ul>
+          <li>Model and exploit **disturbed-soil physics**: changes in bulk density, moisture, thermal conductivity, and surface texture.</li>
+          <li>Use a light **thermal IR camera** to detect **surface temperature anomalies** over those disturbed zones.</li>
+          <li>Fuse with RGB texture / shape to confirm patch geometry matches a mine-sized burial.</li>
+        </ul>
+
+        <div class="diagram-wrapper">
+          <svg viewBox="0 0 600 210" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <marker id="arrowA" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth">
+                <path d="M0,0 L8,4 L0,8 z" fill="#38bdf8"></path>
+              </marker>
+            </defs>
+            <!-- Ground -->
+            <rect x="40" y="110" width="520" height="70" fill="#020617" stroke="#38bdf8" stroke-width="1.2"></rect>
+            <text x="300" y="130" text-anchor="middle" fill="#9ca3af" font-size="11">Ground / Soil</text>
+
+            <!-- Disturbed patch -->
+            <rect x="240" y="110" width="120" height="10" fill="#f97316"></rect>
+            <text x="300" y="108" text-anchor="middle" fill="#f97316" font-size="10">Disturbed Soil Zone</text>
+
+            <!-- Plate -->
+            <ellipse cx="300" cy="160" rx="55" ry="12" fill="rgba(148,163,184,0.5)"></ellipse>
+            <text x="300" y="176" text-anchor="middle" fill="#e5e7eb" font-size="10">Plastic Plate (15&nbsp;cm deep)</text>
+
+            <!-- Drone -->
+            <circle cx="300" cy="35" r="18" fill="#020617" stroke="#22c55e" stroke-width="1.2"></circle>
+            <text x="300" y="39" text-anchor="middle" fill="#e5e7eb" font-size="10">Drone</text>
+            <line x1="300" y1="53" x2="300" y2="110" stroke="#38bdf8" stroke-width="1.1" stroke-dasharray="4 3"></line>
+            <text x="312" y="80" fill="#bae6fd" font-size="10">2&nbsp;m</text>
+
+            <!-- Arrows -->
+            <line x1="100" y1="40" x2="250" y2="40" stroke="#38bdf8" stroke-width="1.2" marker-end="url(#arrowA)"></line>
+            <text x="106" y="33" fill="#bae6fd" font-size="10">Sun / Atmosphere</text>
+
+            <text x="80" y="175" fill="#9ca3af" font-size="10">Undisturbed soil</text>
+            <text x="470" y="175" text-anchor="middle" fill="#9ca3af" font-size="10">Undisturbed soil</text>
+          </svg>
+          <p class="diagram-caption">
+            Concept: the plate at 15&nbsp;cm depth is effectively invisible; we detect the disturbed soil patch above it using thermal and visual cues.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Block B -->
+    <section class="block" id="B-physics">
+      <div class="block-inner">
+        <div class="block-header">
+          <div class="block-title">
+            <span class="block-id">BLOCK B</span>
+            Soil Physics & Disturbance Effects
+          </div>
+        </div>
+        <div class="block-meta">
+          <span class="section-label">Depends on A.</span>
+          For scenario and constraints, see <a href="#A-overview">Block&nbsp;A</a>. This block explains what burial does to soil.
+        </div>
+
+        <h3>What Changes When You Dig and Refill?</h3>
+        <p>Manual burial of a plate in a 30–40&nbsp;cm wide, ~20&nbsp;cm deep hole disturbs soil in three main ways:</p>
+        <ol>
+          <li><strong>Bulk density ↓ &amp; porosity ↑</strong> in the disturbed zone (soil is looser, more air-filled).</li>
+          <li><strong>Moisture distribution changes</strong>: small-scale drying or wetting patterns differ from undisturbed soil.</li>
+          <li><strong>Surface texture &amp; emissivity shift</strong>: fine particles accumulate, micro-roughness changes.</li>
+        </ol>
+
+        <h4>Representative Properties</h4>
+        <p>For typical moist agricultural soil, literature values cluster around:</p>
+        <ul>
+          <li>Undisturbed layer (0–10&nbsp;cm):  
+            bulk density ρ<sub>b</sub> ≈ 1.5&nbsp;Mg/m³, thermal conductivity λ ≈ 1.5&nbsp;W/m·K, volumetric heat capacity C<sub>vol</sub> ≈ 2.0&nbsp;MJ/m³·K.</li>
+          <li>Disturbed layer (0–10&nbsp;cm above the plate) after hand digging:  
+            ρ<sub>b</sub> ≈ 1.2&nbsp;Mg/m³, λ ≈ 1.1&nbsp;W/m·K, C<sub>vol</sub> ≈ 1.5&nbsp;MJ/m³·K.</li>
+          <li>LWIR emissivity changes slightly, e.g. from ε ≈ 0.94 (compact) to ε ≈ 0.96 (finer disturbed surface).</li>
+        </ul>
+
+        <p>These changes mean the disturbed patch:</p>
+        <ul>
+          <li>Has <strong>lower thermal mass</strong> and <strong>slower heat conduction downward</strong>.</li>
+          <li>Heats and cools <strong>faster</strong> than undisturbed surroundings.</li>
+          <li>Appears slightly <strongwarmer or cooler in LWIR images</strong>, depending on time of day.</li>
+        </ul>
+
+        <div class="note-box">
+          <strong>Important:</strong> At 15&nbsp;cm burial depth, the plastic plate’s own thermal influence at the surface is very small.  
+          The dominant signal after a few days is the disturbed soil itself, not the object volume.
+        </div>
+      </div>
+    </section>
+
+    <!-- Block C -->
+    <section class="block" id="C-model">
+      <div class="block-inner">
+        <div class="block-header">
+          <div class="block-title">
+            <span class="block-id">BLOCK C</span>
+            Simple Thermal Model & Contrast Estimate
+          </div>
+        </div>
+        <div class="block-meta">
+          <span class="section-label">Follow after B.</span>
+          Uses soil parameters from <a href="#B-physics">Block&nbsp;B</a> to estimate surface temperature contrast.
+        </div>
+
+        <h3>Energy-Balance Approximation</h3>
+        <p>Consider the top <strong>L = 0.10&nbsp;m</strong> soil layer. For a period of strong sunlight (≈2&nbsp;h) we approximate the temperature rise as:</p>
+        <div class="equation">
+          ΔT ≈ q · Δt / (C<sub>vol</sub> · L)
+        </div>
+        <p>with:</p>
+        <ul>
+          <li>Net absorbed flux <code>q ≈ 500&nbsp;W/m²</code> (sun + sensible heat).</li>
+          <li>Heating duration <code>Δt ≈ 7200&nbsp;s</code> (2&nbsp;h).</li>
+          <li>Parameters <code>C_vol</code> from Block&nbsp;B.</li>
+        </ul>
+
+        <h4>Undisturbed vs. Disturbed Regions</h4>
+        <ul>
+          <li>Undisturbed:  
+            C<sub>vol</sub> ≈ 2.0&nbsp;MJ/m³·K ⇒ ΔT<sub>und</sub> ≈ (500×7200)/(2.0×10⁶×0.1) ≈ <strong>1.8&nbsp;°C</strong>.</li>
+          <li>Disturbed:  
+            C<sub>vol</sub> ≈ 1.5&nbsp;MJ/m³·K ⇒ ΔT<sub>dist</sub> ≈ (500×7200)/(1.5×10⁶×0.1) ≈ <strong>2.4&nbsp;°C</strong>.</li>
+        </ul>
+
+        <p>So after a couple of hours of sun, the disturbed patch is roughly:</p>
+        <p><strong>ΔT<sub>dist</sub> - ΔT<sub>und</sub> ≈ 0.6&nbsp;°C warmer</strong></p>
+        <p>Additional contributors:</p>
+        <ul>
+          <li>Lower λ (less downward conduction) steepens the gradient, nudging the peak difference upwards.</li>
+          <li>Slight emissivity difference (ε ≈ 0.96 vs. 0.94) adds ≈0.1–0.3&nbsp;°C effective radiometric offset.</li>
+        </ul>
+        <p>Combining effects, a realistic **surface temperature contrast** between disturbed patch and background is:</p>
+        <p><strong>ΔT<sub>surface</sub> ≈ 1.0–2.0&nbsp;°C</strong> under favourable clear-sky diurnal cycles.</p>
+
+        <h3>Temporal Behaviour</h3>
+        <p>The sign of the contrast flips over a diurnal cycle:</p>
+        <ul>
+          <li><strong>Morning / early afternoon</strong>: disturbed patch warms faster &rarr; appears **hotter**.</li>
+          <li><strong>Evening / night</strong>: disturbed patch cools faster &rarr; appears **cooler**.</li>
+        </ul>
+
+        <div class="diagram-wrapper">
+          <svg viewBox="0 0 620 210" xmlns="http://www.w3.org/2000/svg">
+            <polyline
+              points="40,150 100,130 160,115 220,110 280,115 340,130 400,150 460,165 520,175"
+              fill="none" stroke="#38bdf8" stroke-width="2"></polyline>
+            <polyline
+              points="40,160 100,140 160,125 220,118 280,120 340,135 400,155 460,170 520,180"
+              fill="none" stroke="#f97316" stroke-width="2"></polyline>
+            <line x1="40" y1="180" x2="520" y2="180" stroke="#4b5563" stroke-width="0.8"></line>
+            <line x1="40" y1="40" x2="40" y2="180" stroke="#4b5563" stroke-width="0.8"></line>
+            <text x="520" y="192" text-anchor="end" fill="#9ca3af" font-size="10">Time of day</text>
+            <text x="45" y="48" fill="#9ca3af" font-size="10">Surface temperature</text>
+            <text x="370" y="104" fill="#38bdf8" font-size="11">Disturbed soil</text>
+            <text x="370" y="122" fill="#f97316" font-size="11">Undisturbed soil</text>
+          </svg>
+          <p class="diagram-caption">
+            Idealised diurnal response: disturbed soil (blue) has larger temperature swings, creating 1–2&nbsp;°C contrast relative to undisturbed soil (orange).
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Block D -->
+    <section class="block" id="D-sensor">
+      <div class="block-inner">
+        <div class="block-header">
+          <div class="block-title">
+            <span class="block-id">BLOCK D</span>
+            Thermal Camera & Drone Geometry
+          </div>
+        </div>
+        <div class="block-meta">
+          <span class="section-label">Builds on C.</span>
+          Uses ΔT from <a href="#C-model">Block&nbsp;C</a> to predict sensor-level signal at 2&nbsp;m altitude.
+        </div>
+
+        <h3>Chosen Sensor Class</h3>
+        <p>We assume a light, UAV-friendly LWIR microbolometer such as:</p>
+        <ul>
+          <li><strong>MLX90640</strong> (32×24 pixels, ≈55°×35° FOV, NETD ≈0.1&nbsp;K at 1&nbsp;Hz), or</li>
+          <li><strong>FLIR Lepton&nbsp;3.x</strong> (160×120 pixels, ≈57° FOV, NETD ≈0.05–0.07&nbsp;K).</li>
+        </ul>
+
+        <h3>Ground Sampling Distance at 2&nbsp;m</h3>
+        <p>For a 55° horizontal FOV camera at 2&nbsp;m altitude:</p>
+        <ul>
+          <li>Ground swath width ≈ 2·h·tan(FOV/2) ≈ 2·2·tan(27.5°) ≈ <strong>2.1&nbsp;m</strong>.</li>
+          <li>With 32 pixels across (MLX90640), each pixel covers ≈ 2.1/32 ≈ <strong>6.5&nbsp;cm</strong>.</li>
+        </ul>
+
+        <p>A typical disturbed patch from a hand-dug hole (≈35&nbsp;cm diameter) therefore spans ≈5–6 pixels across, i.e. roughly 25–35 thermal pixels.</p>
+
+        <h4>Signal vs. Noise</h4>
+        <ul>
+          <li>From Block&nbsp;C: ΔT<sub>surface</sub> ≈ <strong>1–2&nbsp;°C</strong> for disturbed vs undisturbed soil at good times of day.</li>
+          <li>Camera noise (NETD): <strong>0.05–0.1&nbsp;°C</strong>.</li>
+        </ul>
+
+        <p>Therefore a single pixel fully on the disturbed patch has:</p>
+        <p><strong>SNR ≈ 10–40 per frame</strong> (1–2&nbsp;°C signal / 0.05–0.1&nbsp;°C noise).</p>
+
+        <p>Even after including some smoothing and mixing at patch edges, cluster-level detection is highly reliable.</p>
+
+        <div class="diagram-wrapper">
+          <svg viewBox="0 0 620 210" xmlns="http://www.w3.org/2000/svg">
+            <!-- Ground grid -->
+            <rect x="40" y="120" width="540" height="55" fill="#020617" stroke="#4b5563" stroke-width="0.8"></rect>
+            <!-- Pixel grid lines -->
+            <g stroke="#111827" stroke-width="0.5">
+              <!-- vertical lines -->
+              <script type="text/plain">This placeholder is just to avoid confusion in some editors.</script>
+            </g>
+
+            <!-- Draw grid -->
+            <g stroke="#111827" stroke-width="0.5">
+              <!-- vertical -->
+              <!-- 16 lines -->
+              <!-- We'll approximate: -->
+              <line x1="80" y1="120" x2="80" y2="175"></line>
+              <line x1="120" y1="120" x2="120" y2="175"></line>
+              <line x1="160" y1="120" x2="160" y2="175"></line>
+              <line x1="200" y1="120" x2="200" y2="175"></line>
+              <line x1="240" y1="120" x2="240" y2="175"></line>
+              <line x1="280" y1="120" x2="280" y2="175"></line>
+              <line x1="320" y1="120" x2="320" y2="175"></line>
+              <line x1="360" y1="120" x2="360" y2="175"></line>
+              <line x1="400" y1="120" x2="400" y2="175"></line>
+              <line x1="440" y1="120" x2="440" y2="175"></line>
+              <line x1="480" y1="120" x2="480" y2="175"></line>
+              <line x1="520" y1="120" x2="520" y2="175"></line>
+            </g>
+
+            <!-- Highlight disturbed patch (few pixels) -->
+            <rect x="250" y="130" width="120" height="35"
+                  fill="rgba(249,115,22,0.35)" stroke="#f97316" stroke-width="1.2"></rect>
+            <text x="310" y="146" text-anchor="middle" fill="#fde68a" font-size="10">
+              Disturbed patch
+            </text>
+
+            <!-- Drone + rays -->
+            <polygon points="310,40 300,55 320,55" fill="#020617" stroke="#22c55e" stroke-width="1.2"></polygon>
+            <line x1="310" y1="55" x2="40" y2="120" stroke="#38bdf8" stroke-width="1" stroke-dasharray="4 3"></line>
+            <line x1="310" y1="55" x2="580" y2="120" stroke="#38bdf8" stroke-width="1" stroke-dasharray="4 3"></line>
+            <text x="310" y="28" text-anchor="middle" fill="#e5e7eb" font-size="10">Thermal camera on drone</text>
+          </svg>
+          <p class="diagram-caption">
+            From 2&nbsp;m altitude with ≈55° FOV, a disturbed patch covers multiple thermal pixels, giving good spatial resolution and SNR.
+          </p>
+        </div>
+
+        <div class="note-box">
+          <strong>Practical takeaway:</strong> under decent weather, a drone-grade LWIR camera at 2&nbsp;m altitude can clearly resolve recently disturbed patches of mine-like size.  
+          The challenge is not raw detectability, but handling clutter (other disturbances, vegetation, weather).
+        </div>
+      </div>
+    </section>
+
+    <!-- Block E -->
+    <section class="block" id="E-other-sensors">
+      <div class="block-inner">
+        <div class="block-header">
+          <div class="block-title">
+            <span class="block-id">BLOCK E</span>
+            Why Other Sensor Families Fail at 2&nbsp;m
+          </div>
+        </div>
+        <div class="block-meta">
+          <span class="section-label">Optional but important.</span>
+          For design justification, read <a href="#A-overview">A</a> then <a href="#C-model">C</a> before this block.
+        </div>
+
+        <h3>Capacitive / Dielectric Sensing</h3>
+        <ul>
+          <li>Field lines from a plate electrode at 2&nbsp;m mostly travel in air; only a tiny fraction penetrates 15&nbsp;cm into soil.</li>
+          <li>Effective capacitance change from a 20&nbsp;cm plastic plate under 15&nbsp;cm soil at 2&nbsp;m stand-off is ≪10⁻³ of the baseline.</li>
+          <li>Industrial capacitive sensors typically work at millimetre–centimetre distances in air; soil moisture probes are inserted into soil, not flown metres above it.</li>
+        </ul>
+        <p><strong>Conclusion:</strong> capacitive sensing from 2&nbsp;m will see only “bulk soil + air”, with negligible effect from the buried plate or disturbed zone.</p>
+
+        <h3>Metal Detection / EMI</h3>
+        <ul>
+          <li>Plastic plates with minimal metal are inherently poor targets for induction-based detectors.</li>
+          <li>Sensitivity of coil-based systems falls roughly as 1/r³. Going from 0.1&nbsp;m stand-off (handheld detector) to ~2.1&nbsp;m (drone altitude + burial depth) reduces signal by ~8000×.</li>
+          <li>Mine-clearance detectors are specified for ≤10&nbsp;cm stand-off and ≤30&nbsp;cm depth, not metre-scale air gaps.</li>
+        </ul>
+        <p><strong>Conclusion:</strong> from a 2&nbsp;m drone, EMI is effectively blind to plastic plates at 15&nbsp;cm depth.</p>
+
+        <h3>Ground Penetrating Radar (GPR)</h3>
+        <ul>
+          <li>Useful GPR imaging of small plastic mines typically keeps antennas within a few centimetres of the surface.</li>
+          <li>At 1–2&nbsp;GHz, an extra 2&nbsp;m air path adds &gt;40&nbsp;dB free-space loss before soil attenuation and clutter.</li>
+          <li>Contrast between plastic (ε<sub>r</sub>≈3–4) and moist soil (ε<sub>r</sub>≈6–15) is modest; with the power and mass limits of a 500&nbsp;g drone, SNR at 2&nbsp;m is not viable.</li>
+        </ul>
+
+        <h3>Acoustic / Seismic Methods</h3>
+        <ul>
+          <li>Successful acoustic-to-seismic mine detection uses geophones or laser vibrometers near the surface.</li>
+          <li>Pressure fluctuations associated with Rayleigh waves decay extremely quickly with height; microphones at 2&nbsp;m pick up mostly wind and direct speaker noise.</li>
+        </ul>
+
+        <div class="note-box">
+          <strong>Design implication:</strong> for this competition geometry, thermal + visual disturbance detection is the only physically realistic remote modality.  
+          Other sensor families are better suited to ground-contact robots or very low-altitude (<0.2&nbsp;m) platforms.
+        </div>
+      </div>
+    </section>
+
+    <!-- Block F -->
+    <section class="block" id="F-disturbance-cues">
+      <div class="block-inner">
+        <div class="block-header">
+          <div class="block-title">
+            <span class="block-id">BLOCK F</span>
+            Disturbance Cues Beyond Temperature
+          </div>
+        </div>
+        <div class="block-meta">
+          <span class="section-label">Use with D.</span>
+          Thermal contrast from <a href="#D-sensor">Block&nbsp;D</a> is main cue; this block adds complementary visual information.
+        </div>
+
+        <h3>Micro-topography & Shape</h3>
+        <ul>
+          <li>Even well-smoothed backfill tends to leave shallow mounds or depressions (5–20&nbsp;mm amplitude) and altered roughness.</li>
+          <li>With a 12&nbsp;MP RGB camera at 2&nbsp;m, ground sampling distance can be ≈1–2&nbsp;mm per pixel.</li>
+          <li>Shading from a low sun and small changes in texture reveal subtle circular or square patterns consistent with burial holes.</li>
+          <li>Structure-from-motion or stereo (using multiple overlapping images) can reconstruct centimetre-scale height differences for more robust detection, at the cost of extra flight and compute.</li>
+        </ul>
+
+        <h3>Spectral / Moisture Differences</h3>
+        <ul>
+          <li>Disturbed soil often shows changed reflectance in visible + near-infrared bands due to re-distribution of fine particles and altered moisture.</li>
+          <li>Simple indices (e.g. ratios of NIR to red or green channels) can highlight freshly disturbed patches vs older background, especially on bare soil.</li>
+          <li>However, spectral cues are more sensitive to illumination and surface contamination (dust, plant debris) than thermal cues.</li>
+        </ul>
+
+        <h3>Fusion Strategy</h3>
+        <ul>
+          <li>Use **thermal** as the primary detector: find hot/cold blobs of the right size at good diurnal times.</li>
+          <li>Confirm with **RGB shape + local texture**: is it roughly round/rectangular and of mine-like dimensions? Is there visible disturbance?</li>
+          <li>Optionally incorporate **simple spectral ratios** to reject patches that look like puddles, shadows, or vegetation.</li>
+        </ul>
+
+        <div class="note-box">
+          <strong>Goal:</strong> we are detecting “recently disturbed patches of mine-like size”, not the plastic plate itself.  
+          This is honest, physically realistic, and still operationally useful for safe path planning.
+        </div>
+      </div>
+    </section>
+
+    <!-- Block G -->
+    <section class="block" id="G-limits">
+      <div class="block-inner">
+        <div class="block-header">
+          <div class="block-title">
+            <span class="block-id">BLOCK G</span>
+            Limitations & Failure Modes
+          </div>
+        </div>
+        <div class="block-meta">
+          <span class="section-label">Depends on C–F.</span>
+          This block summarises when the approach works and when it becomes unreliable.
+        </div>
+
+        <h3>Conditions Where It Works Well</h3>
+        <ul>
+          <li>Field is mostly **bare soil or sparse low vegetation**.</li>
+          <li>Mines are **buried recently (days–weeks)** and not heavily compacted by machinery afterwards.</li>
+          <li>At least one **clear-sky day** with a normal day–night temperature cycle has occurred after burial.</li>
+          <li>Drone flies during **favourable thermal windows**: shortly after sunrise or in the late afternoon / early evening.</li>
+        </ul>
+
+        <h3>Conditions That Degrade Detection</h3>
+        <ul>
+          <li><strong>Overcast, windy, or rainy periods</strong> smooth out diurnal heating and reduce ΔT below ~0.5&nbsp;°C.</li>
+          <li><strong>Heavy rain + subsequent drying</strong> can recompact the surface and wash fine particles, accelerating decay of the disturbance signature.</li>
+          <li><strong>High clutter environments</strong> (vehicle ruts, many footprints, agricultural operations) create multiple disturbed patches of similar size.</li>
+          <li>Dense **vegetation cover** masks soil both thermally and visually.</li>
+        </ul>
+
+        <h3>Fundamental Limits</h3>
+        <ul>
+          <li>The method cannot reliably detect **old burials** where the soil has fully equilibrated (months–years).</li>
+          <li>It cannot distinguish between “mine burial” and “other large dug hole” if they have similar size and age; classification must rely on context and field rules.</li>
+          <li>Direct detection of **deep or very small objects** remains impossible from 2&nbsp;m with drone-scale sensors.</li>
+        </ul>
+
+        <div class="note-box">
+          <strong>Reporting stance:</strong> always describe the system as detecting <em>recent disturbed soil patches compatible with mines</em>, and clearly state environmental limitations.  
+          This keeps the claims honest while still demonstrating strong practical value within the competition setup.
+        </div>
+      </div>
+    </section>
+
+    <!-- Block H -->
+    <section class="block" id="H-summary">
+      <div class="block-inner">
+        <div class="block-header">
+          <div class="block-title">
+            <span class="block-id">BLOCK H</span>
+            Design Summary for the Competition
+          </div>
+        </div>
+        <div class="block-meta">
+          <span class="section-label">Final block.</span>
+          Assumes you have read Blocks <a href="#A-overview">A</a>–<a href="#G-limits">G</a>.
+        </div>
+
+        <h3>Core Claim</h3>
+        <p>Given a drone altitude of 2&nbsp;m, plastic plates buried at 15&nbsp;cm, and hobby-scale hardware, the only physically realistic remote sensing strategy is:</p>
+        <ol>
+          <li>Detect **recently disturbed soil patches** via their thermal IR and visual signatures.</li>
+          <li>Constrain patch size and shape to match probable mine burials.</li>
+          <li>Use these detections to build a **risk map** and plan a safe corridor for the human.</li>
+        </ol>
+
+        <h3>Key Quantitative Points</h3>
+        <ul>
+          <li>Disturbed top 0–10&nbsp;cm has ≈20–30&nbsp;% lower thermal mass than undisturbed soil.</li>
+          <li>Under clear-sky diurnal heating, this produces **1–2&nbsp;°C surface temperature contrast** for several days to weeks after burial.</li>
+          <li>Drone-grade LWIR cameras with NETD ≈0.05–0.1&nbsp;°C at 2&nbsp;m give **SNR &gt; 10 per pixel** over mine-sized patches.</li>
+          <li>RG B &amp; optional NIR imaging add geometric and spectral cues to reject non-mine disturbances.</li>
+        </ul>
+
+        <h3>Implementation Hooks for Your System Architecture</h3>
+        <p>Within your swarm information-flow (master + scanning drones):</p>
+        <ul>
+          <li>Implement a **thermal anomaly detector** on each scanning drone:
+            <ul>
+              <li>Inputs: temperature grid from LWIR camera, daylight/timing info.</li>
+              <li>Outputs: “disturbance candidates” with location, size, ΔT, and confidence.</li>
+            </ul>
+          </li>
+          <li>Fuse candidates into a **global disturbance map** on the master drone, alongside any prior map information.</li>
+          <li>Inflate disturbance regions by a safety buffer and use them as **obstacles** in the path-planning layer.</li>
+          <li>Communicate the resulting **safe corridor** to the human via formation and LED signalling, as in your existing design.</li>
+        </ul>
+
+        <h3>How to Present This in the Report</h3>
+        <p>In your write-up, you can summarise it roughly as:</p>
+        <div class="note-box">
+          Our platform is not attempting to “see” the plastic plate itself from 2&nbsp;m altitude; physics and sensor limits make that unrealistic at 15&nbsp;cm burial depth.  
+          Instead, we deliberately target the disturbed soil created when organisers dig, place, and backfill the plate. This disturbed zone has measurably different bulk density, moisture, and thermal properties, which yield a 1–2&nbsp;°C surface temperature anomaly for several days under normal diurnal cycles.  
+          A lightweight LWIR camera on each drone, combined with RGB imagery, detects and localises these anomalies with high SNR, letting the swarm mark mine-sized disturbed patches and plan safe, low-risk routes around them.
+        </div>
+      </div>
+    </section>
+
+  </div>
+</main>
+</body>
+</html>
