@@ -9,6 +9,14 @@ The repo is meant to be a single place where the team can track:
 - the **sensor / detection reasoning** for underground mines.
 
 ---
+-
+  `index.html`  
+  👉 https://prabhuparth442.github.io/Gujcost-Robofest-Resource-IITBBS/index.html
+
+- **Information Flow Architecture**  
+  `Information_pipeline.html`  
+  👉 https://prabhuparth442.github.io/Gujcost-Robofest-Resource-IITBBS/Information_pipeline.html
+---
 
 ## 🔍 What our solution is about (short)
 
