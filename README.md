@@ -1,98 +1,75 @@
-[Progress Map for Tracking](https://prabhuparth442.github.io/Gujcost-Robofest-Resource-IITBBS/index.html)
+# 🛰 Aerial Robotics – Minefield Navigation Challenge (GUJCOST Robofest)
 
-# 🛩️ Aerial Robotics – Minefield Navigation Challenge Resources
+This repository collects **design notes, reports, and reference material** for our swarm-drone solution to the GUJCOST Robofest *Aerial Robotics: Minefield Navigation* challenge.
 
-This repository contains **curated open-access papers, articles, and tutorials** to support the ideation stage for the Gujcost Robofest **Aerial Robotics: Minefield Navigation Challenge**.
+The repo is meant to be a single place where the team can track:
 
-The aim is to give the team enough **concepts, examples, and terminology** to brainstorm and defend a swarm-drone-based minefield navigation solution — without wasting time on unnecessary deep theory.
-
-All resources are in **one folder** for convenience. The sections below are only for readability.
-
----
-
-## 📑 Resources by Category
+- the **problem understanding** and constraints,
+- our **swarm architecture & information-flow ideas**, and
+- the **sensor / detection reasoning** for underground mines.
 
 ---
 
-### **A. Drone Basics & Architecture**
-1. `01_PX4_Autopilot_Architecture.pdf` – [Read Online](https://docs.px4.io/main/en/flight_stack/architecture.html)  
-2. `02_Quadcopters_Basics.pdf` – [Read Online](https://ardupilot.org/copter/docs/how-quadcopter-works.html)  
-3. `03_Intro_to_UAV_Systems_Austin.pdf` – Excerpt from *Introduction to UAV Systems*
+## 🔍 What our solution is about (short)
+
+Based on the ideation and design documents in this repo:
+
+- We use a **small swarm of quadrotors** (one master + multiple scanning drones) to escort a human across a minefield.
+- The swarm first performs a **field-scan phase** with the human waiting at the start line.  
+  Each scanning drone:
+  - flies low over the ground,
+  - collects sensor data (thermal + RGB, and possibly other lightweight sensors),
+  - builds a **local occupancy / risk map** around itself, and
+  - sends compressed map tiles and health info to the master drone.
+- The master drone fuses:
+  - local sub-maps from all drones,
+  - any prior information provided in the problem statement,
+  - and our own disturbed-soil / anomaly detections
+  into a **global risk map**.
+- Instead of trying to “see” deep plastic mines directly from 2 m altitude (which is physically unrealistic), we focus on detecting **recently disturbed soil patches of mine-like size** using:
+  - **thermal IR anomalies** (1–2 °C contrast after burial under good conditions),
+  - **RGB texture + micro-topography** (slight mounds/depressions and soil texture changes).
+- From the global risk map the master plans a **safe corridor** with a margin around all suspicious patches.  
+  The swarm then forms a moving formation around the human, continuously updating the corridor and giving clear “go / stop / turn” cues.
+
+Overall aim: a detection-agnostic, safety-first escort system that honestly respects the physics limits while still using the best available cues (disturbed soil, prior map, sensor fusion).
 
 ---
 
-### **B. Swarm Coordination & Multi-Agent Systems**
-4. `04_Boids_Reynolds_1987.pdf` – [PDF](https://www.red3d.com/cwr/boids/)  
-5. `05_Flocking_MultiAgent_OlfatiSaber.pdf` – [PDF](https://ieeexplore.ieee.org/document/1710160)  
-6. `06_Survey_MultiRobot_Systems.pdf` – [PDF](https://arxiv.org/abs/1806.02021)  
+## 📁 Repository Structure
+
+- `index.html`  
+  Static HTML page for a high-level progress map / overview (used with GitHub Pages).
+
+- `Information_pipeline.html`  
+  Visual description of the information-flow / software architecture for the swarm.
+
+- `Reports/`  
+  Notes and working documents:
+  - `18Nov.md`, `21Nov.md`, … – lab-book style design notes, calculations, and sensor discussions.
+  - `README.md` – short explanations per report (if needed).
+
+- `Resources/`  
+  Local copies of **papers, articles, and tutorials** that we found useful during ideation:
+  - UAV and autopilot basics
+  - Swarm robotics and multi-UAV coordination
+  - Path-planning and occupancy-grid mapping
+  - Sensing and detection methods relevant to landmines / underground targets  
+  (File names are descriptive; see the folder listing in GitHub.)
+
+- `LICENSE`  
+  Repository license.
 
 ---
 
-### **C. Mapping & Environmental Representation**
-7. `07_Occupancy_Grids_Elfes_1989.pdf` – [PDF](https://www.cs.cmu.edu/~thorpe/project/thorpe/occupancy_grids.pdf)  
-8. `08_Probabilistic_Robotics_Thrun_Ch9-11.pdf` – [Read Online](http://www.probabilistic-robotics.org/)  
-9. `09_Occupancy_Grid_Map_Overview.pdf` – [Read Online](https://automaticaddison.com/what-is-an-occupancy-grid-map/)  
+## 🧭 How to use this repo
 
----
+- Start with `index.html` and `Information_pipeline.html` to understand the **overall concept and data flow**.
+- Use `Reports/18Nov.md` and later notes to follow the **detailed reasoning** about sensor choices and detection limits (e.g. disturbed-soil thermal signatures).
+- Browse `Resources/` when you need deeper background on a particular topic (flight control, mapping, mine detection physics, etc.).
 
-### **D. Path Planning & Safe Navigation**
-10. `10_AStar_Pathfinding_Visual_Guide.pdf` – [Read Online](https://www.redblobgames.com/pathfinding/a-star/introduction.html)  
-11. `11_Voronoi_Diagram_Path_Planning.pdf` – [Read Online](https://automaticaddison.com/what-is-a-voronoi-diagram/)  
-12. `12_DStar_Lite_Overview.pdf` – [PDF](https://idm-lab.org/bib/abstracts/papers/aaai02b.pdf)  
+All new experiments, simulations, and diagrams should be added either to `Reports/` (for narrative) or as separate HTML/figures referenced from there, so this repo stays the single source of truth for our project.
 
----
-
-### **E. Simulation & Testing**
-13. `13_AirSim_High_Fidelity_Simulation.pdf` – [PDF](https://arxiv.org/abs/1705.05065)  
-14. `14_Gazebo_Simulation_Concepts.pdf` – [PDF](https://ieeexplore.ieee.org/document/1389727)  
-15. `15_Domain_Randomization_Sim2Real.pdf` – [PDF](https://arxiv.org/abs/1703.06907)  
-
----
-
-### **F. Sensors & Perception**
-16. `16_UNet_Image_Segmentation.pdf` – [PDF](https://arxiv.org/abs/1505.04597)  
-17. `17_Object_Detection_Aerial_Survey.pdf` – [PDF](https://arxiv.org/abs/1903.05386)  
-18. `18_Sensor_Fusion_UAV_Navigation.pdf` – [PDF](https://ieeexplore.ieee.org/document/8662052)  
-
----
-
-### **G. Human-Robot Interaction**
-19. `19_Human_Robot_Interaction_Survey.pdf` – [PDF](https://www.researchgate.net/publication/220494812_Human-Robot_Interaction_A_Survey)  
-20. `20_Gesture_Control_UAVs.pdf` – [PDF](https://arxiv.org/abs/2005.05044)  
-
----
-
-### **H. Minefield Context**
-21. `21_Humanitarian_Demining_Habib.pdf` – [PDF](https://www.researchgate.net/publication/228958669_Humanitarian_Demining_Reality_and_the_Challenge_of_Technology)  
-22. `22_Mine_Detection_Sensor_Tech_Overview.pdf` – [PDF](https://apps.dtic.mil/sti/pdfs/ADA412728.pdf)  
-
----
-
-### **I. Extra for Stronger Pitch**
-23. `23_Energy_Efficient_Path_Planning.pdf` – [PDF](https://arxiv.org/abs/1805.04847)  
-24. `24_MultiRobot_Comm_GPS_Denied.pdf` – [PDF](https://hal.science/hal-01647315/document)  
-25. `25_Switching_Control_Formation_Flight.pdf` – [PDF](https://www.researchgate.net/publication/228947846_Switching_Control_for_Formation_Flight_of_Multiple_UAVs)  
-
----
-
-## 📅 Suggested 1-Week Reading Plan
-
-| Day | Focus |
-|-----|-------|
-| 1   | A – Drone Basics |
-| 2   | B – Swarm Coordination |
-| 3   | C – Mapping |
-| 4   | D – Path Planning |
-| 5   | E – Simulation |
-| 6   | F & G – Sensors & HRI |
-| 7   | H & I – Minefield Context & Extras |
-
----
-
-## 📌 Usage Notes
-- **Skim key sections** (intros, diagrams, and “Challenges”) for ideation speed.  
-- Assign topics among teammates to cover all sections quickly.  
-- All files are stored in the **root folder** for easy access.
 
 ---
 
