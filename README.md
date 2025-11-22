@@ -38,15 +38,9 @@ Overall aim: a detection-agnostic, safety-first escort system that honestly resp
 
 ## 📁 Repository Structure
 
-- `index.html`  
-  Static HTML page for a high-level progress map / overview (used with GitHub Pages).
-
-- `Information_pipeline.html`  
-  Visual description of the information-flow / software architecture for the swarm.
-
 - `Reports/`  
   Notes and working documents:
-  - `18Nov.md`, `21Nov.md`, … – lab-book style design notes, calculations, and sensor discussions.
+  - `18Nov.md`, `21Nov.md`, … – Recorded Research and other details we found.
   - `README.md` – short explanations per report (if needed).
 
 - `Resources/`  
@@ -60,15 +54,6 @@ Overall aim: a detection-agnostic, safety-first escort system that honestly resp
 - `LICENSE`  
   Repository license.
 
----
-
-## 🧭 How to use this repo
-
-- Start with `index.html` and `Information_pipeline.html` to understand the **overall concept and data flow**.
-- Use `Reports/18Nov.md` and later notes to follow the **detailed reasoning** about sensor choices and detection limits (e.g. disturbed-soil thermal signatures).
-- Browse `Resources/` when you need deeper background on a particular topic (flight control, mapping, mine detection physics, etc.).
-
-All new experiments, simulations, and diagrams should be added either to `Reports/` (for narrative) or as separate HTML/figures referenced from there, so this repo stays the single source of truth for our project.
 
 
 ---
