@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Robofest Minefield Navigation — One‑Pass Detection & Guidance (v2)</title>
+  <style>
+    :root {
+      --bg: #070b15;
+      --panel: rgba(15, 23, 42, 0.78);
+      --panel-2: rgba(2, 6, 23, 0.72);
+      --text: #e5e7eb;
+      --muted: rgba(226,232,240,.70);
+      --muted2: rgba(226,232,240,.55);
+      --line: rgba(148,163,184,.20);
+      --cyan: #38bdf8;
+      --purple: #a855f7;
+      --green: #22c55e;
+      --amber: #fbbf24;
+      --red: #f43f5e;
+      --radius: 18px;
+      --shadow: 0 20px 55px rgba(0,0,0,.55);
+    }
+    html,body{background: radial-gradient(1400px 700px at 15% -10%, rgba(56,189,248,.18), transparent 55%),
+                         radial-gradient(900px 600px at 85% 0%, rgba(168,85,247,.16), transparent 50%),
+                         var(--bg);
+              color: var(--text); margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;}
+    a{color: var(--cyan); text-decoration: none;}
+    a:hover{text-decoration: underline;}
+    .wrap{max-width: 1080px; margin: 0 auto; padding: 26px 18px 60px;}
+    header.hero{padding: 18px 18px 12px; border: 1px solid var(--line); background: linear-gradient(180deg, rgba(15,23,42,.85), rgba(2,6,23,.55));
+                 border-radius: var(--radius); box-shadow: var(--shadow); position: relative; overflow: hidden;}
+    header.hero:before{content:""; position:absolute; inset:-2px; background:
+      radial-gradient(900px 220px at 30% 0%, rgba(56,189,248,.22), transparent 60%),
+      radial-gradient(900px 220px at 80% 0%, rgba(168,85,247,.20), transparent 60%);
+      pointer-events:none;}
+    .kicker{display:inline-flex; gap:10px; align-items:center; padding:6px 10px; border-radius: 999px;
+            background: rgba(56,189,248,.12); border:1px solid rgba(56,189,248,.28); color: rgba(226,232,240,.9);
+            font-size: 12px; letter-spacing:.3px;}
+    h1{margin: 14px 0 8px; font-size: 28px; line-height: 1.15;}
+    .sub{margin:0; color: var(--muted); max-width: 75ch;}
+    .meta{margin-top: 10px; display:flex; flex-wrap:wrap; gap:10px; color: var(--muted2); font-size: 12px;}
+    .pill{padding:6px 10px; border-radius:999px; border:1px solid var(--line); background: rgba(2,6,23,.35);}
+    nav.toc{margin-top: 18px; display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px;}
+    nav.toc a{display:block; padding:10px 12px; border-radius: 14px; border:1px solid var(--line); background: rgba(2,6,23,.40);}
+    nav.toc a span{display:block; color: var(--muted2); font-size:12px; margin-top:3px;}
+    section.block{margin-top: 16px; border:1px solid var(--line); border-radius: var(--radius); background: var(--panel); box-shadow: var(--shadow);}
+    .inner{padding: 16px 18px;}
+    h2{margin:0 0 10px; font-size: 20px;}
+    h3{margin: 14px 0 8px; font-size: 16px;}
+    p{margin: 10px 0; color: var(--muted); line-height: 1.55;}
+    ul,ol{margin: 10px 0 10px 18px; color: var(--muted); line-height: 1.55;}
+    .grid2{display:grid; grid-template-columns: 1.2fr .8fr; gap: 14px; align-items:start;}
+    @media (max-width: 900px){ .grid2{grid-template-columns: 1fr;} }
+    .callout{border:1px solid rgba(56,189,248,.30); background: rgba(56,189,248,.10); border-radius: 14px; padding: 12px 12px;}
+    .warn{border:1px solid rgba(251,191,36,.35); background: rgba(251,191,36,.10);}
+    .bad{border:1px solid rgba(244,63,94,.35); background: rgba(244,63,94,.08);}
+    .ok{border:1px solid rgba(34,197,94,.35); background: rgba(34,197,94,.10);}
+    .small{font-size: 12px; color: var(--muted2);}
+    code{background: rgba(2,6,23,.45); border: 1px solid rgba(148,163,184,.2); padding: 2px 6px; border-radius: 8px; color: rgba(226,232,240,.92);}
+    pre{background: rgba(2,6,23,.55); border: 1px solid rgba(148,163,184,.2); padding: 12px; border-radius: 14px; overflow:auto; color: rgba(226,232,240,.92);}
+    table{width:100%; border-collapse: separate; border-spacing: 0; overflow:hidden; border-radius: 14px; border:1px solid var(--line); background: rgba(2,6,23,.35);}
+    th,td{padding: 10px 10px; border-bottom: 1px solid rgba(148,163,184,.16); vertical-align: top;}
+    th{text-align:left; font-size: 12px; letter-spacing:.3px; color: rgba(226,232,240,.86); background: rgba(15,23,42,.55);}
+    tr:last-child td{border-bottom:none;}
+    .tag{display:inline-block; padding:2px 8px; border-radius: 999px; font-size: 12px; border:1px solid var(--line); color: rgba(226,232,240,.85);}
+    .tag.c{border-color: rgba(56,189,248,.35); background: rgba(56,189,248,.10);}
+    .tag.p{border-color: rgba(168,85,247,.35); background: rgba(168,85,247,.10);}
+    .tag.g{border-color: rgba(34,197,94,.35); background: rgba(34,197,94,.10);}
+    .tag.a{border-color: rgba(251,191,36,.35); background: rgba(251,191,36,.10);}
+    .tag.r{border-color: rgba(244,63,94,.35); background: rgba(244,63,94,.08);}
+    details{border: 1px solid rgba(148,163,184,.20); border-radius: 14px; background: rgba(2,6,23,.35); padding: 10px 12px;}
+    details summary{cursor:pointer; color: rgba(226,232,240,.9);}
+    .svgwrap{border-radius: 14px; border:1px solid rgba(148,163,184,.20); background: rgba(2,6,23,.45); padding: 10px; overflow:hidden;}
+    .hr{height:1px; background: rgba(148,163,184,.18); margin: 14px 0;}
+    footer{margin-top: 22px; color: var(--muted2); font-size: 12px; text-align:center;}
+  </style>
+</head>
+
+<body>
+<div class="wrap">
+  <header class="hero" id="top">
+    <div class="kicker">Robofest–Gujarat 5.0 • Minefield Navigation • v2</div>
+    <h1>One‑Pass Mine‑Simulant Detection + Safe‑Corridor Guidance (Onboard‑Only)</h1>
+    <p class="sub">
+      Updated to keep <strong>single forward sweep</strong> as the core constraint: the swarm covers the full 20&nbsp;m width
+      while moving forward once, doing <strong>within‑pass verification</strong> using overlap and multi‑modal cues, so you don’t burn battery on extra loops.
+    </p>
+    <div class="meta">
+      <span class="pill">Field: 20&nbsp;m × 100&nbsp;m</span>
+      <span class="pill">Mines: 20–40 buried plastic discs (20–30&nbsp;cm radius)</span>
+      <span class="pill">Buffer: ≥ 1&nbsp;m exclusion</span>
+      <span class="pill">Minimum 4 micro‑drones, onboard processing only</span>
+      <span class="pill">Updated: 15 Dec 2025</span>
+    </div>
+
+    <nav class="toc">
+      <a href="#constraints">1) Constraints that drive design<span>what we must satisfy</span></a>
+      <a href="#onepass">2) One‑pass sweep strategy<span>how we avoid revisits</span></a>
+      <a href="#detection">3) Detection methods (improved)<span>thermal + visual + NIR/polarization</span></a>
+      <a href="#fusion">4) Within‑pass confirmation + mapping<span>2‑of‑3 overlap, tracking</span></a>
+      <a href="#conditions">5) Realistic conditions matrix<span>what can go wrong + mitigations</span></a>
+      <a href="#diagrams">6) Diagrams<span>restored + new</span></a>
+      <a href="#refs">References<span>sources for claims</span></a>
+    </nav>
+  </header>
+
+  <section class="block" id="constraints">
+    <div class="inner">
+      <h2>1) Constraints that drive design</h2>
+      <div class="grid2">
+        <div>
+          <ul>
+            <li><strong>Onboard only:</strong> no external control system; compute must run on the drones.</li>
+            <li><strong>Swarm:</strong> ≥4 micro‑drones, each <em>nominally</em> under 500&nbsp;g (rule set), so sensing must be low‑SWaP.</li>
+            <li><strong>Targets:</strong> <strong>flat plastic discs</strong> (20–30&nbsp;cm radius) <strong>buried completely</strong> (no surface marker).</li>
+            <li><strong>Environment:</strong> outdoor field, 100&nbsp;m long, 20&nbsp;m wide, with possible poles/obstacles (~1.5&nbsp;m).</li>
+            <li><strong>Safety:</strong> generate a <strong>≥1&nbsp;m clearance</strong> corridor; visually communicate it to the human and re-route if needed.</li>
+          </ul>
+          <div class="callout">
+            <strong>Key implication:</strong> you cannot “see plastic” directly with EMI or metal detectors from meters above.
+            The physically realistic remote cue is the <strong>disturbed soil</strong> (thermal + texture/moisture changes) created by digging and backfilling.
+          </div>
+        </div>
+        <div class="callout warn">
+          <strong>Competition twist:</strong> teams may be given an <em>indicative</em> mine layout on A4 paper without dimensions.
+          Treat this as a <strong>prior</strong>, not ground truth: align it to the observed field with a similarity transform (scale/rotate/shift) once a few mines are confirmed.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="onepass">
+    <div class="inner">
+      <h2>2) One‑pass sweep strategy (battery‑first)</h2>
+      <p>
+        Instead of a lawnmower pattern (multiple turns + overlap), the swarm performs a <strong>single straight sweep</strong>
+        from Start → Exit while covering the entire 20&nbsp;m width using formation geometry.
+      </p>
+
+      <div class="svgwrap"><svg viewBox="0 0 900 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Minefield layout and single-pass sweep">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+    </marker>
+    <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+      <path d="M20 0H0V20" fill="none" stroke="rgba(148,163,184,.25)" stroke-width="1"/>
+    </pattern>
+  </defs>
+
+  <!-- Field -->
+  <rect x="30" y="40" width="840" height="220" rx="14" fill="rgba(2,6,23,.85)" stroke="rgba(56,189,248,.8)" stroke-width="2"/>
+  <rect x="30" y="40" width="840" height="220" rx="14" fill="url(#grid)" opacity="0.75"/>
+
+  <!-- Zones -->
+  <rect x="30" y="40" width="84" height="220" rx="14" fill="rgba(34,197,94,.12)" stroke="rgba(34,197,94,.8)" stroke-width="2"/>
+  <text x="72" y="30" text-anchor="middle" font-size="14" fill="rgba(226,232,240,.95)">Start (2m)</text>
+
+  <rect x="114" y="40" width="756" height="220" rx="12" fill="rgba(251,191,36,.06)" stroke="rgba(251,191,36,.55)" stroke-width="2"/>
+  <text x="492" y="30" text-anchor="middle" font-size="14" fill="rgba(226,232,240,.95)">Minefield (90m)</text>
+
+  <rect x="786" y="40" width="84" height="220" rx="14" fill="rgba(168,85,247,.10)" stroke="rgba(168,85,247,.75)" stroke-width="2"/>
+  <text x="828" y="30" text-anchor="middle" font-size="14" fill="rgba(226,232,240,.95)">Exit (8m)</text>
+
+  <!-- Lanes (20m width) -->
+  <line x1="114" y1="113" x2="870" y2="113" stroke="rgba(148,163,184,.55)" stroke-width="2" stroke-dasharray="6 6"/>
+  <line x1="114" y1="187" x2="870" y2="187" stroke="rgba(148,163,184,.55)" stroke-width="2" stroke-dasharray="6 6"/>
+
+  <text x="20" y="150" font-size="12" fill="rgba(226,232,240,.8)" transform="rotate(-90 20 150)">20 m width</text>
+
+  <!-- Drones sweeping -->
+  <g fill="rgba(56,189,248,.95)" stroke="rgba(56,189,248,.95)">
+    <circle cx="160" cy="78" r="8"/><text x="160" y="82" text-anchor="middle" font-size="10" fill="#001018">A</text>
+    <circle cx="160" cy="150" r="8"/><text x="160" y="154" text-anchor="middle" font-size="10" fill="#001018">B</text>
+    <circle cx="160" cy="222" r="8"/><text x="160" y="226" text-anchor="middle" font-size="10" fill="#001018">C</text>
+  </g>
+  <g fill="rgba(168,85,247,.95)" stroke="rgba(168,85,247,.95)">
+    <circle cx="160" cy="40" r="8"/><text x="160" y="44" text-anchor="middle" font-size="10" fill="#14001a">D</text>
+  </g>
+  <path d="M170 78 H 860" stroke="rgba(56,189,248,.85)" stroke-width="3" marker-end="url(#arrow)"/>
+  <path d="M170 150 H 860" stroke="rgba(56,189,248,.75)" stroke-width="3" marker-end="url(#arrow)"/>
+  <path d="M170 222 H 860" stroke="rgba(56,189,248,.65)" stroke-width="3" marker-end="url(#arrow)"/>
+  <path d="M170 40 H 860" stroke="rgba(168,85,247,.75)" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <!-- Mines (examples) -->
+  <g fill="rgba(244,63,94,.95)" opacity=".85">
+    <circle cx="350" cy="95" r="7"/>
+    <circle cx="420" cy="170" r="7"/>
+    <circle cx="540" cy="205" r="7"/>
+    <circle cx="640" cy="120" r="7"/>
+    <circle cx="720" cy="165" r="7"/>
+  </g>
+  <text x="350" y="270" font-size="12" fill="rgba(226,232,240,.8)">
+    One-pass concept: scanners A/B/C cover the full 20 m width while moving forward once; overwatch D cross-confirms.
+  </text>
+</svg></div>
+
+      <h3>Formation & roles</h3>
+      <ul>
+        <li><span class="tag c">Scanners A/B/C</span> fly laterally spaced with deliberate overlap (e.g., 25–40% sidelap) to enable <strong>within‑pass cross‑confirmation</strong>.</li>
+        <li><span class="tag p">Overwatch D</span> flies higher with a wider footprint, acting as: (i) tie‑breaker/veto on detections, (ii) corridor supervisor, (iii) fallback leader.</li>
+        <li><span class="tag g">Lane‑marker mode</span> after corridor is computed: two drones mark corridor edges, one stays as forward beacon, overwatch monitors.</li>
+      </ul>
+
+      <h3>Altitude & speed selection (so one pass is enough)</h3>
+      <p>
+        Pick altitude so the thermal camera footprint covers your lane width <em>and</em> the disc diameter still spans enough pixels for a stable blob/shape estimate.
+        A practical target is <strong>≥15–25 pixels across a 40–60&nbsp;cm diameter</strong> disc in thermal frames.
+      </p>
+
+      <details>
+        <summary><strong>Quick GSD sanity check</strong> (copy into report)</summary>
+        <p class="small">
+          Thermal footprint width (meters) ≈ <code>2·h·tan(HFOV/2)</code>. GSD ≈ <code>footprint_width / pixels</code>.
+          Example: HFOV≈57°, h=7.5&nbsp;m ⇒ footprint≈8.1&nbsp;m. With 320px width ⇒ GSD≈2.5&nbsp;cm/px.
+          A 0.5&nbsp;m disc spans ~20px in thermal: enough for robust detection in one pass.
+        </p>
+      </details>
+
+      <div class="callout ok">
+        <strong>One‑pass rule of thumb:</strong> keep scanners at constant altitude & speed; avoid “stop‑and‑hover” verifications.
+        Verification happens via <strong>overlap + multi‑modal cues + track consistency</strong>.
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="detection">
+    <div class="inner">
+      <h2>3) Detection methods (improved)</h2>
+      <p>
+        Because the discs are buried, the goal is to detect the <strong>disturbed patch</strong> (changed thermal inertia, moisture pattern, surface roughness),
+        not the plastic itself. Below are the realistic cues that work from a drone.
+      </p>
+
+      <div class="svgwrap"><svg viewBox="0 0 900 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Single-pass detection pipeline">
+  <defs>
+    <linearGradient id="g1" x1="0" x2="1">
+      <stop offset="0" stop-color="rgba(56,189,248,.28)"/>
+      <stop offset="1" stop-color="rgba(168,85,247,.18)"/>
+    </linearGradient>
+    <marker id="arr" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="rgba(226,232,240,.9)"/>
+    </marker>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="rgba(0,0,0,.35)"/>
+    </filter>
+  </defs>
+
+  <rect x="18" y="20" width="864" height="220" rx="16" fill="rgba(2,6,23,.78)" stroke="rgba(148,163,184,.35)"/>
+
+  <!-- Boxes -->
+  <g filter="url(#shadow)" font-family="ui-sans-serif, system-ui">
+    <rect x="40" y="60" width="150" height="90" rx="14" fill="rgba(15,23,42,.9)" stroke="rgba(56,189,248,.55)"/>
+    <text x="115" y="90" text-anchor="middle" font-size="13" fill="rgba(226,232,240,.95)">Sensors</text>
+    <text x="115" y="112" text-anchor="middle" font-size="11" fill="rgba(226,232,240,.75)">LWIR + RGB</text>
+    <text x="115" y="132" text-anchor="middle" font-size="11" fill="rgba(226,232,240,.75)">(+NIR / Pol.)</text>
+
+    <rect x="230" y="60" width="170" height="90" rx="14" fill="rgba(15,23,42,.9)" stroke="rgba(56,189,248,.55)"/>
+    <text x="315" y="88" text-anchor="middle" font-size="13" fill="rgba(226,232,240,.95)">Preprocess</text>
+    <text x="315" y="110" text-anchor="middle" font-size="11" fill="rgba(226,232,240,.75)">stabilize +</text>
+    <text x="315" y="130" text-anchor="middle" font-size="11" fill="rgba(226,232,240,.75)">background model</text>
+
+    <rect x="440" y="50" width="190" height="110" rx="14" fill="url(#g1)" stroke="rgba(226,232,240,.25)"/>
+    <text x="535" y="80" text-anchor="middle" font-size="13" fill="rgba(226,232,240,.95)">Candidate mining</text>
+    <text x="535" y="102" text-anchor="middle" font-size="11" fill="rgba(226,232,240,.80)">ΔT blob + size gate</text>
+    <text x="535" y="124" text-anchor="middle" font-size="11" fill="rgba(226,232,240,.80)">texture / ring cue</text>
+    <text x="535" y="146" text-anchor="middle" font-size="11" fill="rgba(226,232,240,.80)">track across frames</text>
+
+    <rect x="670" y="60" width="180" height="90" rx="14" fill="rgba(15,23,42,.9)" stroke="rgba(168,85,247,.55)"/>
+    <text x="760" y="88" text-anchor="middle" font-size="13" fill="rgba(226,232,240,.95)">Cross-confirm</text>
+    <text x="760" y="110" text-anchor="middle" font-size="11" fill="rgba(226,232,240,.75)">2-of-3 overlap</text>
+    <text x="760" y="130" text-anchor="middle" font-size="11" fill="rgba(226,232,240,.75)">+ overwatch veto</text>
+
+    <rect x="310" y="170" width="260" height="60" rx="14" fill="rgba(34,197,94,.14)" stroke="rgba(34,197,94,.55)"/>
+    <text x="440" y="205" text-anchor="middle" font-size="13" fill="rgba(226,232,240,.95)">Inflate mines → safe corridor</text>
+
+    <rect x="600" y="170" width="250" height="60" rx="14" fill="rgba(251,191,36,.12)" stroke="rgba(251,191,36,.55)"/>
+    <text x="725" y="197" text-anchor="middle" font-size="13" fill="rgba(226,232,240,.95)">Mark corridor (LED lane)</text>
+    <text x="725" y="218" text-anchor="middle" font-size="11" fill="rgba(226,232,240,.75)">human guidance + reroute</text>
+  </g>
+
+  <!-- Arrows -->
+  <path d="M190 105 H 225" stroke="rgba(226,232,240,.85)" stroke-width="2.5" marker-end="url(#arr)"/>
+  <path d="M400 105 H 435" stroke="rgba(226,232,240,.85)" stroke-width="2.5" marker-end="url(#arr)"/>
+  <path d="M630 105 H 665" stroke="rgba(226,232,240,.85)" stroke-width="2.5" marker-end="url(#arr)"/>
+  <path d="M535 160 V 170" stroke="rgba(226,232,240,.85)" stroke-width="2.5" marker-end="url(#arr)"/>
+  <path d="M570 200 H 595" stroke="rgba(226,232,240,.85)" stroke-width="2.5" marker-end="url(#arr)"/>
+
+  <text x="45" y="38" font-size="13" fill="rgba(226,232,240,.85)">All steps are onboard; designed to work in a single forward sweep.</text>
+</svg></div>
+
+      <h3>3.1 Passive LWIR thermography (primary)</h3>
+      <ul>
+        <li><strong>Why it works:</strong> disturbed soil often heats/cools differently (changed bulk density, porosity, moisture distribution), producing surface thermal contrast.</li>
+        <li><strong>How to do it in one pass:</strong> run a rolling “local background” model (median filter + temporal EMA) and threshold on <code>ΔT = T − T_local</code>.</li>
+        <li><strong>False positives control:</strong> apply size‑gate using expected disc diameter and altitude; track candidates across ≥N frames to ensure persistence.</li>
+      </ul>
+      <div class="callout">
+        <strong>Implementation note:</strong> prefer radiometric thermal modules (absolute temperature) if available; otherwise use relative contrast (more robust to calibration drift).
+      </div>
+
+      <h3>3.2 RGB micro‑topography & texture (secondary)</h3>
+      <ul>
+        <li>Backfill leaves subtle <strong>roughness / ring / mound</strong> cues and different particle sorting (fine dust vs clods).</li>
+        <li>Use a lightweight segmentation model or classical features:
+          <ul>
+            <li>Local contrast + entropy map for “freshly disturbed texture”</li>
+            <li>Circle/ellipse hypothesis: Hough + circularity score (works best when soil is bare)</li>
+          </ul>
+        </li>
+        <li>Even if thermal contrast is weak (overcast), RGB can still gate candidates.</li>
+      </ul>
+
+      <h3>3.3 Near‑IR / low‑cost multispectral (optional but realistic)</h3>
+      <ul>
+        <li>Soil moisture and organic content affect reflectance in VNIR/NIR; disturbed patches can show a reflectance shift.</li>
+        <li>Lightweight option: add a second tiny camera with an <strong>850&nbsp;nm long‑pass filter</strong> and compute a simple index like <code>(NIR − R)/(NIR + R)</code> (approx‑NDVI on bare soil).</li>
+        <li>This is not “magic,” but it helps reduce false positives caused by shadows or color variations in RGB.</li>
+      </ul>
+
+      <h3>3.4 Polarization (glare/wet‑soil robustness)</h3>
+      <ul>
+        <li>Wet soil and puddles create specular highlights that break texture detection.</li>
+        <li>A polarization camera or a simple linear polarizer (with 2–3 orientations over time) can suppress specular components and stabilize features.</li>
+      </ul>
+
+      <div class="callout warn">
+        <strong>What we intentionally do NOT rely on (for a flying platform):</strong>
+        capacitive sensing, coil‑based metal detection, GPR from meter standoff, or acoustic‑seismic methods.
+        These are excellent on ground robots but not viable from typical drone altitudes.
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="fusion">
+    <div class="inner">
+      <h2>4) Within‑pass confirmation + mapping (no second sweep)</h2>
+
+      <h3>4.1 2‑of‑3 overlap confirmation (key to “single pass”)</h3>
+      <p>
+        With lateral overlap, the same ground patch is observed by two scanners within seconds.
+        Confirm a mine only if at least <strong>2 drones agree</strong> within a spatial tolerance (e.g., ≤0.6&nbsp;m) and time tolerance (e.g., ≤2&nbsp;s).
+      </p>
+      <ul>
+        <li><strong>Thermal agreement:</strong> both drones see a blob of consistent size and contrast.</li>
+        <li><strong>Visual agreement:</strong> both have elevated texture‑disturbance score, or ring/mound cue.</li>
+        <li><strong>Overwatch veto:</strong> reject if overwatch sees “obvious clutter” pattern or the candidate is inconsistent across modalities.</li>
+      </ul>
+
+      <h3>4.2 Candidate tracking instead of hovering</h3>
+      <p>
+        In one-pass mode, you don’t stop. You track candidates across frames as the drone moves, using optical flow / IMU-stabilized homography.
+        Persistence across frames strongly reduces one-off noise triggers.
+      </p>
+
+      <h3>4.3 Mapping + corridor creation</h3>
+      <ul>
+        <li>Represent mines in a 2D occupancy grid (log‑odds update is easy and stable).</li>
+        <li>Inflate each confirmed mine by ≥1&nbsp;m exclusion zone (plus a margin for localization error).</li>
+        <li>Run a fast planner (A*, D* Lite) on the inflated grid to compute a corridor (2.5–3&nbsp;m wide feels comfortable).</li>
+        <li>Do not advance the human unless you have ≥10&nbsp;m of validated corridor ahead.</li>
+      </ul>
+
+      <details>
+        <summary><strong>Minimal pseudo‑pipeline (report‑friendly)</strong></summary>
+        <pre>
+for each scanner drone:
+  for each frame:
+    T = thermal_frame()
+    RGB = rgb_frame()
+    Tn = T - local_median(T, k=31)                 # local contrast
+    blobs = threshold_and_label(Tn, tau)
+    for b in blobs:
+      if size_gate(b, expected_disc_px_range):
+        v_score = texture_disturbance(RGB, b.roi)
+        track_update(b, v_score)
+
+  publish candidates (x,y, size, ΔT, v_score, time)
+
+on master/overwatch:
+  associate candidates across drones (space+time gating)
+  confirm if ≥2 scanners agree and confidence > C*
+  update occupancy grid and inflate hazards
+  plan corridor; command lane-marker formation + LEDs
+        </pre>
+      </details>
+    </div>
+  </section>
+
+  <section class="block" id="conditions">
+    <div class="inner">
+      <h2>5) Realistic conditions matrix (what to test + how to handle)</h2>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Condition</th>
+            <th>How it breaks detection</th>
+            <th>Mitigation that still keeps “one pass”</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="tag a">Overcast / low thermal contrast</span></td>
+            <td>LWIR anomalies shrink; thermal-only thresholding fails.</td>
+            <td>Increase reliance on RGB texture + ring cue; lower thermal threshold but require stronger multi-drone agreement.</td>
+          </tr>
+          <tr>
+            <td><span class="tag a">Wet soil / puddles / glare</span></td>
+            <td>Specular highlights corrupt RGB features; thermal can show noisy reflections.</td>
+            <td>Use polarization/anti-glare filter; prefer local-contrast thermal (ΔT) not absolute T; raise persistence requirement.</td>
+          </tr>
+          <tr>
+            <td><span class="tag c">Wind / vibration / motion blur</span></td>
+            <td>False blobs & unstable ROI alignment.</td>
+            <td>Short exposures; IMU-stabilized warping; candidate must persist across frames and be confirmed by overlap.</td>
+          </tr>
+          <tr>
+            <td><span class="tag c">Vegetation patches</span></td>
+            <td>Texture changes unrelated to mines; thermal influenced by canopy.</td>
+            <td>Vegetation mask (simple green index) to reduce false alarms; corridor avoids dense vegetation by default.</td>
+          </tr>
+          <tr>
+            <td><span class="tag r">Footprints / tire tracks</span></td>
+            <td>Creates thermal + texture disturbance similar to digging.</td>
+            <td>Use shape prior: disc-like size/circularity + “centered blob”; require 2-of-3 agreement plus overwatch veto.</td>
+          </tr>
+          <tr>
+            <td><span class="tag r">Rocks / debris</span></td>
+            <td>Hot rocks or cool stones create thermal anomalies.</td>
+            <td>Geometric gate: disc diameter + circularity; NIR ratio and RGB color statistics help reject “rocky” ROIs.</td>
+          </tr>
+          <tr>
+            <td><span class="tag a">Harsh shadows (low sun)</span></td>
+            <td>Shadow edges look like “rings” in RGB.</td>
+            <td>Downweight RGB ring cue; rely on thermal + multi-drone agreement; use shadow detector to avoid false rings.</td>
+          </tr>
+          <tr>
+            <td><span class="tag p">Uneven terrain</span></td>
+            <td>Altitude variations change footprint/GSD → wrong size gate.</td>
+            <td>ToF/range or baro+optical flow to estimate height; compute expected pixel size online.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout">
+        <strong>Testing tip:</strong> you can simulate most of these conditions in a practice plot: water a strip, add rocks, create footprints,
+        and vary flight altitude/speed to build a robust dataset for your exact camera.
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="diagrams">
+    <div class="inner">
+      <h2>6) Diagrams (restored + expanded)</h2>
+      <p>These SVG diagrams are embedded directly so the report stays self‑contained.</p>
+
+      <h3>6.1 Soil disturbance cross‑section (restored)</h3>
+      <div class="svgwrap"><svg viewBox="0 0 600 210" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <marker id="arrowA" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth">
+                <path d="M0,0 L8,4 L0,8 z" fill="#38bdf8"></path>
+              </marker>
+            </defs>
+            <!-- Ground -->
+            <rect x="40" y="110" width="520" height="70" fill="#020617" stroke="#38bdf8" stroke-width="1.2"></rect>
+            <text x="300" y="130" text-anchor="middle" fill="#9ca3af" font-size="11">Ground / Soil</text>
+
+            <!-- Disturbed patch -->
+            <rect x="240" y="110" width="120" height="10" fill="#f97316"></rect>
+            <text x="300" y="108" text-anchor="middle" fill="#f97316" font-size="10">Disturbed Soil Zone</text>
+
+            <!-- Plate -->
+            <ellipse cx="300" cy="160" rx="55" ry="12" fill="rgba(148,163,184,0.5)"></ellipse>
+            <text x="300" y="176" text-anchor="middle" fill="#e5e7eb" font-size="10">Plastic Plate (15&nbsp;cm deep)</text>
+
+            <!-- Drone -->
+            <circle cx="300" cy="35" r="18" fill="#020617" stroke="#22c55e" stroke-width="1.2"></circle>
+            <text x="300" y="39" text-anchor="middle" fill="#e5e7eb" font-size="10">Drone</text>
+            <line x1="300" y1="53" x2="300" y2="110" stroke="#38bdf8" stroke-width="1.1" stroke-dasharray="4 3"></line>
+            <text x="312" y="80" fill="#bae6fd" font-size="10">2&nbsp;m</text>
+
+            <!-- Arrows -->
+            <line x1="100" y1="40" x2="250" y2="40" stroke="#38bdf8" stroke-width="1.2" marker-end="url(#arrowA)"></line>
+            <text x="106" y="33" fill="#bae6fd" font-size="10">Sun / Atmosphere</text>
+
+            <text x="80" y="175" fill="#9ca3af" font-size="10">Undisturbed soil</text>
+            <text x="470" y="175" text-anchor="middle" fill="#9ca3af" font-size="10">Undisturbed soil</text>
+          </svg></div>
+
+      <h3>6.2 Diurnal contrast intuition (restored)</h3>
+      <div class="svgwrap"><svg viewBox="0 0 620 210" xmlns="http://www.w3.org/2000/svg">
+            <polyline
+              points="40,150 100,130 160,115 220,110 280,115 340,130 400,150 460,165 520,175"
+              fill="none" stroke="#38bdf8" stroke-width="2"></polyline>
+            <polyline
+              points="40,160 100,140 160,125 220,118 280,120 340,135 400,155 460,170 520,180"
+              fill="none" stroke="#f97316" stroke-width="2"></polyline>
+            <line x1="40" y1="180" x2="520" y2="180" stroke="#4b5563" stroke-width="0.8"></line>
+            <line x1="40" y1="40" x2="40" y2="180" stroke="#4b5563" stroke-width="0.8"></line>
+            <text x="520" y="192" text-anchor="end" fill="#9ca3af" font-size="10">Time of day</text>
+            <text x="45" y="48" fill="#9ca3af" font-size="10">Surface temperature</text>
+            <text x="370" y="104" fill="#38bdf8" font-size="11">Disturbed soil</text>
+            <text x="370" y="122" fill="#f97316" font-size="11">Undisturbed soil</text>
+          </svg></div>
+
+      <h3>6.3 Grid map + inflated exclusion zones (restored)</h3>
+      <div class="svgwrap"><svg viewBox="0 0 620 210" xmlns="http://www.w3.org/2000/svg">
+            <!-- Ground grid -->
+            <rect x="40" y="120" width="540" height="55" fill="#020617" stroke="#4b5563" stroke-width="0.8"></rect>
+            <!-- Pixel grid lines -->
+            <g stroke="#111827" stroke-width="0.5">
+              <!-- vertical lines -->
+              <script type="text/plain">This placeholder is just to avoid confusion in some editors.</script>
+            </g>
+
+            <!-- Draw grid -->
+            <g stroke="#111827" stroke-width="0.5">
+              <!-- vertical -->
+              <!-- 16 lines -->
+              <!-- We'll approximate: -->
+              <line x1="80" y1="120" x2="80" y2="175"></line>
+              <line x1="120" y1="120" x2="120" y2="175"></line>
+              <line x1="160" y1="120" x2="160" y2="175"></line>
+              <line x1="200" y1="120" x2="200" y2="175"></line>
+              <line x1="240" y1="120" x2="240" y2="175"></line>
+              <line x1="280" y1="120" x2="280" y2="175"></line>
+              <line x1="320" y1="120" x2="320" y2="175"></line>
+              <line x1="360" y1="120" x2="360" y2="175"></line>
+              <line x1="400" y1="120" x2="400" y2="175"></line>
+              <line x1="440" y1="120" x2="440" y2="175"></line>
+              <line x1="480" y1="120" x2="480" y2="175"></line>
+              <line x1="520" y1="120" x2="520" y2="175"></line>
+            </g>
+
+            <!-- Highlight disturbed patch (few pixels) -->
+            <rect x="250" y="130" width="120" height="35"
+                  fill="rgba(249,115,22,0.35)" stroke="#f97316" stroke-width="1.2"></rect>
+            <text x="310" y="146" text-anchor="middle" fill="#fde68a" font-size="10">
+              Disturbed patch
+            </text>
+
+            <!-- Drone + rays -->
+            <polygon points="310,40 300,55 320,55" fill="#020617" stroke="#22c55e" stroke-width="1.2"></polygon>
+            <line x1="310" y1="55" x2="40" y2="120" stroke="#38bdf8" stroke-width="1" stroke-dasharray="4 3"></line>
+            <line x1="310" y1="55" x2="580" y2="120" stroke="#38bdf8" stroke-width="1" stroke-dasharray="4 3"></line>
+            <text x="310" y="28" text-anchor="middle" fill="#e5e7eb" font-size="10">Thermal camera on drone</text>
+          </svg></div>
+
+      <div class="hr"></div>
+      <div class="callout ok">
+        <strong>New diagrams added:</strong> (i) field + single‑pass sweep, (ii) onboard pipeline.
+        If you want, I can also add a “camera footprint vs altitude” chart specific to your chosen lenses.
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="refs">
+    <div class="inner">
+      <h2>References (for report credibility)</h2>
+      <p class="small">
+        Keep these as clickable citations in your submission. (A few are surveys/datasets that are easy to cite.)
+      </p>
+      <ul class="small">
+        <li>Infrared thermography for landmine detection: IR contrasts form at the soil surface above buried objects (Springer chapter).</li>
+        <li>Thermographic datasets for buried-landmine detection (experimental thermograms; equipment specs).</li>
+        <li>UAV-based approaches using infrared thermography (recent overview / experiments).</li>
+        <li>Hyperspectral imaging surveys and UAV VNIR hyperspectral benchmark datasets (as “optional modality”).</li>
+        <li>Polarization-based reflection suppression methods (for wet-soil/glare robustness).</li>
+        <li>Thermal camera module specs (Boson family: SWaP, power ~600 mW, resolutions).</li>
+      </ul>
+
+      <details>
+        <summary><strong>What to say in one paragraph (ready to paste)</strong></summary>
+        <p class="small">
+          “Because the mines are fully buried plastic discs, our drones do not attempt to directly sense the plastic volume from meters above the ground.
+          Instead, we detect the disturbed soil patch produced when the disc is buried and the soil is backfilled. Disturbance alters thermal inertia,
+          moisture distribution, and surface texture, which can create measurable thermal and visual anomalies. We use a passive LWIR module and RGB imaging
+          on each scanner drone, and perform within-pass verification by requiring agreement across overlapping views (2-of-3) plus an overwatch veto.
+          This enables full 20 m field-width coverage in a single forward sweep while meeting onboard-only and battery constraints.”
+        </p>
+      </details>
+    </div>
+  </section>
+
+  <footer>
+    v2 report template — designed for Robofest constraints and single-pass operation.
+  </footer>
+</div>
+</body>
+</html>
