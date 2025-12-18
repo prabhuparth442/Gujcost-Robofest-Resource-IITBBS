@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>High-Fidelity Thermal Discriminator</title>
+    <title>High-Fidelity Thermal Discriminator - GUJCOST Robofest Edition</title>
     <!-- Updated Plotly to a recent v2 release to fix console warnings and improve stability -->
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <style>
@@ -18,24 +18,24 @@
         .val { float: right; color: var(--accent); font-family: 'JetBrains Mono', monospace; font-weight: bold; }
         h1 { font-size: 1.1rem; margin: 15px 0 10px 0; color: var(--accent); border-bottom: 2px solid #334155; padding-bottom: 8px; }
         .chart-container { flex: 1; background: #1e293b; border-radius: 16px; padding: 15px; border: 1px solid #334155; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
-        
+       
         .diff-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
         .diff-card { background: #0f172a; padding: 15px; border-radius: 10px; border: 1px solid #334155; text-align: center; }
         .diff-label { font-size: 0.65rem; color: #94a3b8; display: block; margin-bottom: 6px; text-transform: uppercase; }
         .diff-val { font-size: 1.2rem; font-weight: 800; }
-        .delta-pos { color: #ff7675; } 
-        .delta-neg { color: #74b9ff; } 
+        .delta-pos { color: #ff7675; }
+        .delta-neg { color: #74b9ff; }
         .status-msg { font-size: 0.75rem; color: #94a3b8; margin-top: 10px; font-style: italic; line-height: 1.4; }
     </style>
 </head>
 <body>
-
 <div id="sidebar">
     <h1>Physics-Based Selection</h1>
     <div class="control-group">
         <label>Object Class</label>
         <select id="preset" onchange="applyPreset()">
             <optgroup label="Subsurface Threats (Conductive Bottleneck)">
+                <option value="pp_hdpe">Plastic Plate (PP/HDPE - Project Default)</option>
                 <option value="pvc">Plastic Mine (PVC - High Contrast)</option>
                 <option value="hdpe">Plastic Mine (HDPE - Low Contrast)</option>
             </optgroup>
@@ -47,26 +47,24 @@
                 <option value="surface_rock">Surface Rock (Direct Absorption)</option>
             </optgroup>
         </select>
-        
-        <label>Thermal Conductivity (k) <span class="val" id="v-km">0.19</span> W/mK</label>
-        <input type="range" id="km" min="0.05" max="3.5" step="0.05" value="0.19">
-        
-        <label>Heat Capacity (ρCp) <span class="val" id="v-rhocpm">1.8</span> MJ/m³K</label>
-        <input type="range" id="rhocpm" min="0.5" max="4.0" step="0.1" value="1.8">
+       
+        <label>Thermal Conductivity (k) <span class="val" id="v-km">0.28</span> W/mK</label>
+        <input type="range" id="km" min="0.05" max="3.5" step="0.05" value="0.28">
+       
+        <label>Heat Capacity (ρCp) <span class="val" id="v-rhocpm">1.75</span> MJ/m³K</label>
+        <input type="range" id="rhocpm" min="0.5" max="4.0" step="0.1" value="1.75">
     </div>
-
     <h1>Geometry & Depth (δ-Scaled)</h1>
     <div class="control-group">
-        <label>Burial Depth (L) <span class="val" id="v-L">5</span> cm</label>
-        <input type="range" id="L" min="0" max="25" step="1" value="5">
-        
-        <label>Anomaly Radius (R) <span class="val" id="v-R">12</span> cm</label>
-        <input type="range" id="R" min="5" max="40" step="1" value="12">
-        
-        <label>Solar Time (24h) <span class="val" id="v-time">14:00</span></label>
-        <input type="range" id="time" min="0" max="23.9" step="0.1" value="14.0">
+        <label>Burial Depth (L) <span class="val" id="v-L">15</span> cm</label>
+        <input type="range" id="L" min="0" max="30" step="1" value="15">
+       
+        <label>Anomaly Radius (R) <span class="val" id="v-R">25</span> cm</label>
+        <input type="range" id="R" min="5" max="40" step="1" value="25">
+       
+        <label>Solar Time (24h) <span class="val" id="v-time">15:00</span></label>
+        <input type="range" id="time" min="0" max="23.9" step="0.1" value="15.0">
     </div>
-
     <h1>Real-time Differential Analysis</h1>
     <div class="control-group diff-panel">
         <div class="diff-card">
@@ -83,44 +81,41 @@
         </div>
     </div>
     <div class="status-msg" id="phys-note">
-        Calculating attenuation based on skin depth...
+        Calculating attenuation based on skin depth... (For IR detection: Negative ΔT = cooler spot for plastic plates in afternoon; use for threshold tuning.)
     </div>
 </div>
-
 <div id="main">
     <div id="mainChart" class="chart-container"></div>
 </div>
-
 <script>
 const dataSet = {
+    pp_hdpe: { k: 0.28, cp: 1.75, isSurface: false },  // Added for project: PP/HDPE from Thermal Inertia doc
     pvc: { k: 0.19, cp: 1.8, isSurface: false },
     hdpe: { k: 0.45, cp: 2.3, isSurface: false },
     granite: { k: 3.0, cp: 2.1, isSurface: false },
     moisture: { k: 1.2, cp: 3.8, isSurface: false },
     surface_rock: { k: 2.8, cp: 2.2, isSurface: true }
 };
-
-// Global Soil Constants (Validated SI Units)
-const ks = 1.0;          // W/mK
-const rhoCps = 1.6e6;   // J/m^3K
+// Global Soil Constants (Validated SI Units - moist soil from project doc)
+const ks = 1.0; // W/mK
+const rhoCps = 1.6e6; // J/m^3K
 const omega = (2 * Math.PI) / 86400; // 7.27e-5 rad/s
-const Q_eff = 350;      // Effective surface flux (W/m^2) accounting for convection
-
+const Q_eff = 230; // Effective surface flux (W/m^2) tuned for ~40°C peak at 3 PM Ahmedabad Dec
+const T_baseline = 25; // °C - average undisturbed ground for Dec (adjust if needed)
 function applyPreset() {
     const p = document.getElementById('preset').value;
     document.getElementById('km').value = dataSet[p].k;
     document.getElementById('rhocpm').value = dataSet[p].cp;
-    
-    // Auto-set depth to 0 if it's a surface rock
+   
+    // Auto-set depth to 0 if surface, else project default 15 cm
     if(dataSet[p].isSurface) {
         document.getElementById('L').value = 0;
-    } else if (document.getElementById('L').value == 0) {
-        document.getElementById('L').value = 5;
+    } else {
+        document.getElementById('L').value = 15;
     }
-    
+   
     update();
 }
-
 function update() {
     const km = parseFloat(document.getElementById('km').value);
     const rhocpm = parseFloat(document.getElementById('rhocpm').value) * 1e6;
@@ -128,51 +123,49 @@ function update() {
     const R = parseFloat(document.getElementById('R').value) / 100;
     const hr = parseFloat(document.getElementById('time').value);
     const presetKey = document.getElementById('preset').value;
-
     // Update UI Displays
     document.getElementById('v-km').innerText = km;
-    document.getElementById('v-rhocpm').innerText = (rhocpm/1e6).toFixed(1);
+    document.getElementById('v-rhocpm').innerText = (rhocpm/1e6).toFixed(2);
     document.getElementById('v-L').innerText = (L*100).toFixed(0);
     document.getElementById('v-R').innerText = (R*100).toFixed(0);
     const h = Math.floor(hr);
     const m = Math.round((hr % 1) * 60);
     document.getElementById('v-time').innerText = `${h}:${m.toString().padStart(2,'0')}`;
-
     // --- PHYSICS ENGINE ---
-    
-    // 1. Correct Skin Depth Calculation (Standard SI: ~12cm for soil)
+   
+    // 1. Skin Depth Calculation (~13 cm for moist soil)
     const alpha_s = ks / rhoCps;
-    const delta_s = Math.sqrt(2 * alpha_s / omega); 
-    
-    // 2. Thermal Impedance (Frequency Domain)
-    const Zs = 1 / Math.sqrt(omega * ks * rhoCps);
-    const Zm = 1 / Math.sqrt(omega * km * rhocpm);
-    
-    // 3. Reflection Coefficient (Gamma)
-    // Positive for Plastic (Insulator), Negative for Rock (Sink)
-    const Gamma = (Zm - Zs) / (Zm + Zs);
-
-    // 4. Time Domain Forcing (Shifted so noon is peak)
-    const t_sec = (hr - 12) * 3600;
-
-    // 5. Background Temperature (Phase shifted 45 deg)
-    const T_baseline = 28;
-    const T_soil = T_baseline + (Q_eff * Zs * Math.cos(omega * t_sec - Math.PI/4));
-
-    // 6. Anomaly Peak Calculation
+    const delta_s = Math.sqrt(2 * alpha_s / omega);
+   
+    // 2. Thermal Effusivity
+    const Zs = Math.sqrt(ks * rhoCps);
+    const Zm = Math.sqrt(km * rhocpm);
+   
+    // 3. Reflection Coefficient (Positive for insulators like plastic, negative for conductors like rock)
+    const Gamma = (Zs - Zm) / (Zs + Zm);
+   
+    // 4. Time Domain Forcing (Shifted to 3 PM peak for Ahmedabad)
+    const t_sec = (hr - 15) * 3600;
+    const sqrt_omega = Math.sqrt(omega);
+    const amplitude = Q_eff / (Zs * sqrt_omega);
+    const phase = omega * t_sec - Math.PI/4;
+    const T_soil = T_baseline + amplitude * Math.cos(phase);
+   
+    // 5. Anomaly Peak Calculation
     let T_anom;
     if (dataSet[presetKey].isSurface) {
-        // Surface Rock Model: Direct Solar Absorptivity Bias + high inertia
-        // Rock absorbs more (alpha ~0.9) than soil (alpha ~0.7)
-        const rock_solar_bias = 1.35; 
-        T_anom = T_baseline + (Q_eff * rock_solar_bias * Zm * Math.cos(omega * t_sec - Math.PI/4));
+        // Surface Rock Model: Higher absorptivity bias
+        const rock_solar_bias = 1.35;
+        const Zm_adjusted = Zm * rock_solar_bias;
+        const amplitude_surface = Q_eff / (Zm_adjusted * sqrt_omega);
+        T_anom = T_baseline + amplitude_surface * Math.cos(phase);
     } else {
         // Subsurface reflection model
         const atten = Math.exp(-2 * L / delta_s);
         const phase_delay = -2 * L / delta_s;
-        T_anom = T_soil + (Q_eff * Zs * Gamma * atten * Math.cos(omega * t_sec - Math.PI/4 + phase_delay));
+        const reflected = amplitude * Gamma * atten;
+        T_anom = T_soil + reflected * Math.cos(phase + phase_delay);
     }
-
     // --- UI DATA FEED ---
     const delta = T_anom - T_soil;
     document.getElementById('val-surf').innerText = T_soil.toFixed(1) + "°C";
@@ -180,11 +173,10 @@ function update() {
     const deltaEl = document.getElementById('val-delta');
     deltaEl.innerText = (delta > 0 ? "+" : "") + delta.toFixed(2) + "°C";
     deltaEl.className = "diff-val " + (delta > 0 ? "delta-pos" : "delta-neg");
-    
-    document.getElementById('phys-note').innerText = 
-        `Skin Depth (δ): ${(delta_s*100).toFixed(1)} cm. ` + 
-        (L > delta_s ? "Note: Target is beyond damping depth." : "Target is in detection zone.");
-
+   
+    document.getElementById('phys-note').innerText =
+        `Skin Depth (δ): ${(delta_s*100).toFixed(1)} cm. ` +
+        (L > delta_s ? "Target beyond damping depth - weak IR signal for drone." : "Target in detection zone - good for 2m scan, verify at 0.5m.");
     // --- SPATIAL PLOT ---
     let x_pts = [], y_pts = [];
     for(let x=-60; x<=60; x++) {
@@ -195,23 +187,21 @@ function update() {
         const weight = 1 / (1 + Math.exp((r - R) / edge_sharpness));
         y_pts.push(T_soil + (T_anom - T_soil) * weight);
     }
-
     Plotly.newPlot('mainChart', [{
         x: x_pts, y: y_pts, fill: 'tozeroy',
         line: {color: delta > 0 ? '#ff7675' : '#74b9ff', width: 4},
         fillcolor: delta > 0 ? 'rgba(255, 118, 117, 0.15)' : 'rgba(116, 185, 255, 0.15)'
     }], {
-        title: { text: 'Surface Thermal Gradient Cross-section', font: { color: '#94a3b8', size: 14 } },
+        title: { text: 'Surface Thermal Gradient Cross-section (IR View for Drone)', font: { color: '#94a3b8', size: 14 } },
         paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
-        font: {color: '#94a3b8'}, 
+        font: {color: '#94a3b8'},
         margin: {t:50, b:50, l:60, r:30},
         xaxis: { title: 'Distance from Center (cm)', gridcolor: '#334155', zeroline: false },
         yaxis: { title: 'Temp (°C)', autorange: true, gridcolor: '#334155' }
     }, {responsive: true});
 }
-
 document.querySelectorAll('input').forEach(i => i.addEventListener('input', update));
-window.onload = update;
+window.onload = () => { applyPreset(); update(); };  // Default to project preset on load
 </script>
 </body>
 </html>
