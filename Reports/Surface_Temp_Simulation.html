@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Advanced Thermal Target Discriminator</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        :root { --accent: #2ecc71; --bg: #0f172a; --panel: #1e293b; --text: #f8fafc; }
+        body { font-family: 'Inter', sans-serif; display: flex; height: 100vh; margin: 0; background: var(--bg); color: var(--text); }
+        #sidebar { width: 400px; background: var(--panel); padding: 20px; border-right: 1px solid #334155; overflow-y: auto; }
+        #main { flex-grow: 1; padding: 20px; display: flex; flex-direction: column; gap: 20px; }
+        .control-group { margin-bottom: 15px; background: #0f172a; padding: 15px; border-radius: 10px; border: 1px solid #334155; }
+        label { display: block; margin-bottom: 5px; font-size: 0.75rem; color: #94a3b8; font-weight: bold; }
+        select, input[type="range"] { width: 100%; margin-bottom: 10px; accent-color: var(--accent); }
+        .val { float: right; color: var(--accent); font-family: monospace; }
+        h1 { font-size: 1rem; margin: 10px 0; color: var(--accent); text-transform: uppercase; }
+        .chart-container { flex: 1; background: #1e293b; border-radius: 12px; padding: 10px; border: 1px solid #334155; }
+        
+        /* New Differential Panel Styles */
+        .diff-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .diff-card { background: #0f172a; padding: 12px; border-radius: 8px; border: 1px solid #334155; text-align: center; }
+        .diff-label { font-size: 0.7rem; color: #94a3b8; display: block; margin-bottom: 4px; }
+        .diff-val { font-size: 1.1rem; font-weight: bold; }
+        .delta-pos { color: #ff7675; } /* Heat */
+        .delta-neg { color: #74b9ff; } /* Cold */
+    </style>
+</head>
+<body>
+
+<div id="sidebar">
+    <h1>Target Selection</h1>
+    <div class="control-group">
+        <select id="preset" onchange="applyPreset()">
+            <optgroup label="Threats">
+                <option value="pvc">Plastic Mine (PVC)</option>
+                <option value="hdpe">Plastic Mine (HDPE)</option>
+            </optgroup>
+            <optgroup label="False Positives (Clutter)">
+                <option value="granite">Granite Boulder</option>
+                <option value="basalt">Basalt Rock</option>
+                <option value="moisture">Moist Soil Patch</option>
+            </optgroup>
+        </select>
+        <label>Conductivity (k) <span class="val" id="v-km">0.19</span></label>
+        <input type="range" id="km" min="0.05" max="3.5" step="0.05" value="0.19">
+    </div>
+
+    <h1>Geometry & Environment</h1>
+    <div class="control-group">
+        <label>Depth (L) <span class="val" id="v-L">5</span> cm</label>
+        <input type="range" id="L" min="1" max="25" step="1" value="5">
+        <label>Radius (R) <span class="val" id="v-R">12</span> cm</label>
+        <input type="range" id="R" min="5" max="35" step="1" value="12">
+        <label>Time (24h) <span class="val" id="v-time">14:00</span></label>
+        <input type="range" id="time" min="0" max="23.9" step="0.1" value="14">
+    </div>
+
+    <h1>Differential Analysis</h1>
+    <div class="control-group diff-panel">
+        <div class="diff-card">
+            <span class="diff-label">Surface (Soil)</span>
+            <span class="diff-val" id="val-surf">--</span>
+        </div>
+        <div class="diff-card">
+            <span class="diff-label">Anomaly Peak</span>
+            <span class="diff-val" id="val-anom">--</span>
+        </div>
+        <div class="diff-card" style="grid-column: span 2;">
+            <span class="diff-label">Signal Delta (ΔT)</span>
+            <span class="diff-val" id="val-delta">--</span>
+        </div>
+    </div>
+</div>
+
+<div id="main">
+    <div id="mainChart" class="chart-container"></div>
+</div>
+
+<script>
+const dataSet = {
+    pvc: { k: 0.19, cp: 1.8 },
+    hdpe: { k: 0.44, cp: 2.3 },
+    granite: { k: 3.1, cp: 2.1 },
+    basalt: { k: 2.5, cp: 2.4 },
+    moisture: { k: 1.8, cp: 3.5 }
+};
+
+const ks = 1.1; const cps = 1.6e6; const omega = (2*Math.PI)/(86400);
+
+function applyPreset() {
+    const p = document.getElementById('preset').value;
+    document.getElementById('km').value = dataSet[p].k;
+    update();
+}
+
+function update() {
+    const km = parseFloat(document.getElementById('km').value);
+    const rhocpm = 1.8e6; // Simplified constant for logic flow
+    const L = parseFloat(document.getElementById('L').value)/100;
+    const R = parseFloat(document.getElementById('R').value)/100;
+    const hr = parseFloat(document.getElementById('time').value);
+
+    // Displays
+    document.getElementById('v-km').innerText = km;
+    document.getElementById('v-L').innerText = (L*100).toFixed(0);
+    document.getElementById('v-R').innerText = (R*100).toFixed(0);
+    document.getElementById('v-time').innerText = Math.floor(hr)+":"+Math.round((hr%1)*60).toString().padStart(2,'0');
+
+    // Physics Engine
+    const delta_s = Math.sqrt((2*ks/cps)/omega);
+    const Zs = 1/Math.sqrt(omega*ks*cps);
+    const Zm = 1/Math.sqrt(omega*km*rhocpm);
+    const Gamma = (Zm - Zs)/(Zm + Zs);
+    const t_sec = (hr-12)*3600;
+
+    const T_soil = 28 + (300 * Zs * Math.cos(omega*t_sec - Math.PI/4));
+    const T_anom = T_soil + (300 * Zs * Gamma * Math.exp(-2*L/delta_s) * Math.cos(omega*t_sec - Math.PI/4 - 2*L/delta_s));
+
+    // Update Differential Panel
+    const delta = T_anom - T_soil;
+    document.getElementById('val-surf').innerText = T_soil.toFixed(1) + "°";
+    document.getElementById('val-anom').innerText = T_anom.toFixed(1) + "°";
+    const deltaEl = document.getElementById('val-delta');
+    deltaEl.innerText = (delta > 0 ? "+" : "") + delta.toFixed(2) + "°C";
+    deltaEl.className = "diff-val " + (delta > 0 ? "delta-pos" : "delta-neg");
+
+    // Spatial Map
+    let x_pts = [], y_pts = [];
+    for(let x=-60; x<=60; x++) {
+        x_pts.push(x);
+        const r = Math.abs(x)/100;
+        const w = 1 / (1 + Math.exp((r - R) / (0.02 + L*0.4)));
+        y_pts.push(T_soil + (T_anom - T_soil)*w);
+    }
+
+    Plotly.newPlot('mainChart', [{
+        x: x_pts, y: y_pts, fill: 'tozeroy',
+        line: {color: delta > 0 ? '#ff7675' : '#74b9ff', width: 3}
+    }], {
+        title: 'Real-time Surface Thermal Gradient',
+        paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+        font: {color: '#94a3b8'}, margin: {t:40},
+        yaxis: {autorange: true, gridcolor: '#334155'}
+    });
+}
+
+document.querySelectorAll('input').forEach(i => i.addEventListener('input', update));
+window.onload = update;
+</script>
+</body>
+</html>
