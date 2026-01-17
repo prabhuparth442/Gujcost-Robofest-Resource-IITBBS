@@ -9,3 +9,7 @@
 - **Simulation of T_s(r,t) due mine/plastic:**  
   `According to the report Surface_Temperature_due_to_Mines.pdf`  
   => https://prabhuparth442.github.io/Gujcost-Robofest-Resource-IITBBS/Reports/Surface_Temp_Simulation.html
+- **ArduPilot & Gazebo Integration Guide:**  
+  `ArduPilot_Gazebo_Integration_Errors_Report.md`  
+   Complete troubleshooting guide for drone simulation with ArduPilot and Gazebo. Covers 5 critical errors (network multicast, protocol magic, Anaconda conflicts, safety checks), golden configuration setup, and working Python hover script using MAVSDK.
+  => https://prabhuparth442.github.io/Gujcost-Robofest-Resource-IITBBS/Reports/ArduPilot_Gazebo_Integration_Errors_Report.md
