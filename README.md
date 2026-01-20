@@ -16,6 +16,10 @@ The repo is meant to be a single place where the team can track:
 - **Information Flow Architecture**  
   `Information_pipeline.html`  
   👉 https://prabhuparth442.github.io/Gujcost-Robofest-Resource-IITBBS/Information_pipeline.html
+
+- **Planned Roadmap**  
+  `plan.html`  
+  👉 https://prabhuparth442.github.io/Gujcost-Robofest-Resource-IITBBS/plan.html
 ---
 
 ## 🔍 What our solution is about (short)
