@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drone Team Progress Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ 
+            startOnLoad: false, 
+            securityLevel: 'loose',
+            layout: 'elk', // Using Elk as requested in config
+            theme: 'dark'
+        });
+        window.mermaid = mermaid;
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body { background-color: #1a1a1a; color: #e5e5e5; font-family: 'Segoe UI', sans-serif; }
+        #diagram-container { 
+            width: 100%; 
+            height: 80vh; 
+            overflow: auto; 
+            cursor: grab;
+            display: flex;
+            justify-content: center;
+        }
+        /* Custom Badge Styling injected into SVG */
+        .progress-badge { font-size: 10px; font-weight: bold; fill: #fff; }
+        .progress-rect { fill: #333; stroke: #fff; stroke-width: 0.5px; opacity: 0.9; }
+        
+        /* Node Hover Effects */
+        .node:hover { opacity: 0.8; cursor: pointer; transition: 0.2s; }
+    </style>
+</head>
+<body class="h-screen flex flex-col">
+
+    <nav class="bg-gray-800 p-4 border-b border-gray-700 flex justify-between items-center">
+        <div class="font-bold text-xl"><i class="fas fa-project-diagram mr-2 text-green-500"></i>Drone Project Tracker</div>
+        <div class="flex gap-3">
+            <button onclick="openSettings()" class="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm transition">
+                <i class="fas fa-cog mr-1"></i> Config
+            </button>
+            <button id="saveBtn" onclick="saveToGitHub()" class="bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-sm transition hidden">
+                <i class="fas fa-cloud-upload-alt mr-1"></i> Save Progress
+            </button>
+        </div>
+    </nav>
+
+    <div id="diagram-container" class="bg-neutral-900 relative">
+        <div id="mermaid-graph" class="w-full h-full flex justify-center"></div>
+    </div>
+
+    <div id="editModal" class="fixed inset-0 bg-black bg-opacity-70 hidden flex items-center justify-center z-50">
+        <div class="bg-gray-800 p-6 rounded-lg shadow-xl w-80 border border-gray-600">
+            <h3 class="text-lg font-bold mb-4" id="modalTitle">Edit Node</h3>
+            <label class="block text-sm text-gray-400 mb-2">Completion Percentage</label>
+            <input type="range" id="progressInput" min="0" max="100" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer mb-2">
+            <div class="text-center font-mono text-2xl text-green-400 mb-4"><span id="progressVal">0</span>%</div>
+            
+            <label class="block text-sm text-gray-400 mb-2">Notes</label>
+            <textarea id="noteInput" class="w-full bg-gray-700 rounded p-2 text-sm mb-4" rows="3" placeholder="Blockers or details..."></textarea>
+            
+            <div class="flex justify-end gap-2">
+                <button onclick="closeModal()" class="px-4 py-2 bg-gray-600 rounded hover:bg-gray-500">Cancel</button>
+                <button onclick="updateNodeData()" class="px-4 py-2 bg-green-600 rounded hover:bg-green-500">Update</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="settingsModal" class="fixed inset-0 bg-black bg-opacity-80 hidden flex items-center justify-center z-50">
+        <div class="bg-gray-800 p-6 rounded-lg w-96 border border-gray-600">
+            <h3 class="text-lg font-bold mb-4 text-blue-400">GitHub Connection</h3>
+            <p class="text-xs text-gray-400 mb-4">Your token is stored locally in your browser, not on a server.</p>
+            
+            <input id="gh-token" type="password" placeholder="GitHub Personal Access Token" class="w-full bg-gray-700 border border-gray-600 p-2 rounded mb-3 text-sm">
+            <input id="gh-owner" type="text" placeholder="Username (e.g., jdoe)" class="w-full bg-gray-700 border border-gray-600 p-2 rounded mb-3 text-sm">
+            <input id="gh-repo" type="text" placeholder="Repository Name" class="w-full bg-gray-700 border border-gray-600 p-2 rounded mb-3 text-sm">
+            <input id="gh-path" type="text" value="progress.json" placeholder="File Path" class="w-full bg-gray-700 border border-gray-600 p-2 rounded mb-3 text-sm">
+            
+            <button onclick="saveSettings()" class="w-full bg-blue-600 hover:bg-blue-500 p-2 rounded font-bold">Connect & Load</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+
+        // 1. THE DIAGRAM DEFINITION
+        const graphDefinition = `
+%%{init: {'theme': 'dark', 'layout': 'elk'} }%%
+flowchart TB
+ subgraph s2["Path Planning Module"]
+        n8["Global Probability Grid"]
+        n9["Error and Safety distribution in Grid"]
+        n10["Planning Module"]
+        n12["Broadest Safe Corridor Finding"]
+  end
+ subgraph s3["Single Drone Autonomous"]
+        n25["Autonomous Drone Scripting"]
+        n26["Simulation Check"]
+        n27["Works ?"]
+        n28["Loiter Mode Drone Testing"]
+        n29["Works ?"]
+  end
+ subgraph s4["Complex Movement Scripting"]
+        n31["Autonomous Drone Scripting"]
+        n32["Simulation Check"]
+        n33["Works ?"]
+        n34["Loiter Mode Drone Testing"]
+        n35["Works ?"]
+  end
+ subgraph s5["Detection Sensor"]
+        n2["Logical Section"]
+        SENSOR_STACK["Stack of images<br>from Thermal Sensor"]
+        SPIRAL["Image Processing and Detection Algorithms"]
+        THERMAL_MOD["Thermal mine detection"]
+        n3["RGC Camera"]
+        n4["Movement Function to Decrease Error in Images"]
+  end
+ subgraph s6["Master Slave Prototype"]
+        n47["Master Slave Prototyping"]
+        n48["Scripting"]
+        n49["Simulation"]
+        n50["Loiter"]
+  end
+    FINAL_PRODUCT(["Start"]) --> HW_ZERO["Zero Drone"] & s5 & n41["Drone Communication Sensors"] & n42["Building Other Drones"]
+    HW_ZERO --> HW_BORROW["Borrowed Drone"]
+    HW_BORROW --> HW_FLASH["Flashing & Scripting"]
+    HW_FLASH --> HW_RPI["RPi and other connections"]
+    HW_RPI --> n24["Single Drone Flight Testing"]
+    SENSOR_STACK --> SPIRAL
+    THERMAL_MOD --> SENSOR_STACK
+    PROC_INFO["Processed Information<br>from sensor module"] --> PARAM["Simplistic parameter conversion"] & n6["Memory Module"]
+    n2 --> THERMAL_MOD & n3
+    n3 --> n4
+    n4 --> SPIRAL
+    SPIRAL --> n5["Verification Layer"]
+    n5 --> PROC_INFO
+    n6 --> n7["A4 Paper Hint Check Module"] & n8
+    n7 --> n5
+    n8 --> n9
+    n9 --> n10
+    n10 --> n12
+    n24 --> s3
+    n25 --> n26
+    n26 --> n27
+    n27 --> n28 & n25
+    n28 --> n29
+    n29 --> n25
+    s3 --> n30["Branching"]
+    n31 --> n32
+    n32 --> n33
+    n33 -- Yes --> n34
+    n33 -- No --> n31
+    n34 --> n35
+    n35 -- No --> n31
+    n30 --> n36["Two Drone Simulation"] & s4 & n54["Black Box Creation"]
+    n36 --> n37["Simple Movement Script"]
+    n37 -.-> n36
+    n37 --> n38["Loiter Mode Two Drone Script Test"]
+    n38 --> n39["Complex two Drone Movements"] & n40["Drone - to - Drone Communication"]
+    s4 --> n39
+    n41 --> n40
+    n42 --> n38
+    n40 --> n46["Two Drone Communication Testing"]
+    n40 -.-> n53["Time Synchronization (NTP)"]
+    n43["Data Transfer Pipeline"] --> n45["Swarm Coordination and Data Transfer"]
+    n46 --> n43
+    n47 --> n48
+    n48 --> n49
+    n49 --> n50
+    n50 --> n48
+    n39 --> n51["Master Slave Drone Movements"]
+    n45 --> s6
+    s6 --> n51
+    n51 --> n52["Scaling"]
+    n52 -.-> s6
+    s2 --> n41
+    PARAM --> n41 & n55["Sensor Data Integration"]
+    n53 -.-> n46
+    n52 --> n55
+    n55 --> n56["Prototype"]
+
+    n31@{ shape: rect}
+    n32@{ shape: rect}
+    n33@{ shape: rect}
+    n34@{ shape: rect}
+    n35@{ shape: rect}
+    n2@{ shape: rect}
+    classDef robust fill:#b91c1c,stroke:#fff,stroke-width:2px,color:#fff
+    classDef optional fill:#eee,stroke:#999,stroke-width:1px,stroke-dasharray:5 5
+    style FINAL_PRODUCT fill:#000,stroke:#f97316,stroke-width:4px,color:#fff
+    style n41 fill:#424242,color:#FFFFFF,stroke:#00C853
+    style n6 stroke:#FFD600,fill:#424242,color:#FFFFFF
+    style s3 stroke:#00C853
+    style n56 stroke:#D50000,color:#FFFFFF,fill:#424242
+        `;
+
+        // State Management
+        let appData = {}; 
+        let currentSha = ""; 
+        let activeNodeId = null;
+
+        // Render Graph
+        const renderGraph = async () => {
+            const element = document.querySelector("#mermaid-graph");
+            const { svg } = await mermaid.render('mermaid-svg', graphDefinition);
+            element.innerHTML = svg;
+            attachInteractivity();
+            applyVisualState();
+        };
+
+        // Attach Click Listeners
+        const attachInteractivity = () => {
+            const nodes = document.querySelectorAll('.node');
+            nodes.forEach(node => {
+                node.addEventListener('click', (e) => {
+                    // Mermaid IDs allow us to find the specific node ID
+                    // Usually format is flowchart-id-key
+                    const rawId = node.id.split('-')[1]; 
+                    openEditModal(rawId);
+                });
+            });
+        };
+
+        // Apply colors and badges based on data
+        const applyVisualState = () => {
+            Object.keys(appData).forEach(id => {
+                const percentage = appData[id].progress || 0;
+                const nodeEl = document.querySelector(`[id*="${id}"]`);
+                
+                if (nodeEl) {
+                    // 1. Colorize stroke based on progress
+                    let color = '#fff'; // default
+                    if (percentage > 0 && percentage < 100) color = '#facc15'; // yellow
+                    if (percentage == 100) color = '#4ade80'; // green
+
+                    const rect = nodeEl.querySelector('rect, polygon, circle, path');
+                    if(rect) {
+                        rect.style.stroke = color;
+                        rect.style.strokeWidth = percentage > 0 ? "3px" : "1px";
+                    }
+
+                    // 2. Add/Update Percentage Badge
+                    // Remove old badge if exists
+                    const existingBadge = nodeEl.querySelector('.status-badge');
+                    if (existingBadge) existingBadge.remove();
+
+                    if (percentage > 0) {
+                        // Create SVG group for badge
+                        const bbox = nodeEl.getBBox();
+                        const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+                        g.setAttribute("class", "status-badge");
+                        // Position at bottom center of node
+                        g.setAttribute("transform", `translate(${bbox.width/2 - 15}, ${bbox.height + 15})`);
+
+                        const badgeRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                        badgeRect.setAttribute("width", "30");
+                        badgeRect.setAttribute("height", "14");
+                        badgeRect.setAttribute("rx", "4");
+                        badgeRect.setAttribute("fill", color);
+                        
+                        const badgeText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                        badgeText.textContent = `${percentage}%`;
+                        badgeText.setAttribute("x", "15");
+                        badgeText.setAttribute("y", "10");
+                        badgeText.setAttribute("text-anchor", "middle");
+                        badgeText.setAttribute("font-size", "9px");
+                        badgeText.setAttribute("fill", "#000");
+                        badgeText.setAttribute("font-weight", "bold");
+
+                        g.appendChild(badgeRect);
+                        g.appendChild(badgeText);
+                        nodeEl.appendChild(g);
+                    }
+                }
+            });
+        };
+
+        // Modal Functions
+        window.openEditModal = (id) => {
+            activeNodeId = id;
+            const data = appData[id] || { progress: 0, note: '' };
+            document.getElementById('modalTitle').innerText = `Edit: ${id}`;
+            document.getElementById('progressInput').value = data.progress;
+            document.getElementById('progressVal').innerText = data.progress;
+            document.getElementById('noteInput').value = data.note || '';
+            document.getElementById('editModal').classList.remove('hidden');
+        };
+
+        window.closeModal = () => {
+            document.getElementById('editModal').classList.add('hidden');
+        };
+
+        window.updateNodeData = () => {
+            const prog = parseInt(document.getElementById('progressInput').value);
+            const note = document.getElementById('noteInput').value;
+            
+            appData[activeNodeId] = { progress: prog, note: note };
+            closeModal();
+            applyVisualState();
+            document.getElementById('saveBtn').classList.remove('hidden'); // Show save button
+        };
+
+        // Input listener for range slider
+        document.getElementById('progressInput').addEventListener('input', (e) => {
+            document.getElementById('progressVal').innerText = e.target.value;
+        });
+
+        // --- GITHUB INTEGRATION ---
+
+        window.openSettings = () => {
+            document.getElementById('gh-token').value = localStorage.getItem('gh_token') || '';
+            document.getElementById('gh-owner').value = localStorage.getItem('gh_owner') || '';
+            document.getElementById('gh-repo').value = localStorage.getItem('gh_repo') || '';
+            document.getElementById('settingsModal').classList.remove('hidden');
+        };
+
+        window.saveSettings = async () => {
+            const token = document.getElementById('gh-token').value;
+            const owner = document.getElementById('gh-owner').value;
+            const repo = document.getElementById('gh-repo').value;
+            const path = document.getElementById('gh-path').value;
+
+            if(!token || !owner || !repo) { alert("Please fill all fields"); return; }
+
+            localStorage.setItem('gh_token', token);
+            localStorage.setItem('gh_owner', owner);
+            localStorage.setItem('gh_repo', repo);
+            localStorage.setItem('gh_path', path);
+
+            document.getElementById('settingsModal').classList.add('hidden');
+            await loadFromGitHub();
+        };
+
+        async function loadFromGitHub() {
+            const token = localStorage.getItem('gh_token');
+            const owner = localStorage.getItem('gh_owner');
+            const repo = localStorage.getItem('gh_repo');
+            const path = localStorage.getItem('gh_path');
+
+            if(!token) return;
+
+            try {
+                const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+                    headers: { 'Authorization': `token ${token}` }
+                });
+                
+                if(response.ok) {
+                    const json = await response.json();
+                    currentSha = json.sha; // Important for updates
+                    const content = atob(json.content);
+                    appData = JSON.parse(content);
+                    applyVisualState();
+                    alert("Data loaded from GitHub!");
+                } else {
+                    console.error("Could not load data. File might not exist yet.");
+                }
+            } catch(e) {
+                console.error(e);
+                alert("Error loading from GitHub");
+            }
+        }
+
+        window.saveToGitHub = async () => {
+            const token = localStorage.getItem('gh_token');
+            const owner = localStorage.getItem('gh_owner');
+            const repo = localStorage.getItem('gh_repo');
+            const path = localStorage.getItem('gh_path');
+
+            const content = btoa(JSON.stringify(appData, null, 2)); // Base64 encode
+
+            const body = {
+                message: "Update progress from visual tracker",
+                content: content,
+                sha: currentSha // Required if file exists
+            };
+
+            try {
+                const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(body)
+                });
+
+                if(response.ok) {
+                    const json = await response.json();
+                    currentSha = json.content.sha; // Update SHA for next save
+                    document.getElementById('saveBtn').classList.add('hidden');
+                    alert("Progress saved to GitHub!");
+                } else {
+                    alert("Failed to save. Check console.");
+                }
+            } catch(e) {
+                console.error(e);
+                alert("Network error.");
+            }
+        };
+
+        // Initial Render
+        renderGraph();
+        // Check for auto-login
+        if(localStorage.getItem('gh_token')) {
+            loadFromGitHub();
+        }
+    </script>
+</body>
+</html>
