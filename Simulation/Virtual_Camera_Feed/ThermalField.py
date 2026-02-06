@@ -57,8 +57,8 @@ class ThermalMap:
         #Error Constants
         #-----------------------------------------------------------------------------------------------------------------
         # Error Constants for Ahmedabad Drone Survey
-        self.error_gps_sigma         = 0.45   # Meters error (x,y) : with normal drone should be 1.5
-        self.error_alt_sigma         = 0.1   # Meters error (h)   : with normal drone should be 1.5
+        self.error_gps_sigma         = 1.5   # Meters error (x,y) : with normal drone should be 1.5
+        self.error_alt_sigma         = 1.5   # Meters error (h)   : with normal drone should be 1.5
 
         self.error_attn_coeff        = 0.002 # Per meter (Moderate winter air)
         self.error_path_radiance     = 20.0  # Degrees Celsius (Air temp)
