@@ -40,6 +40,25 @@ ssh -o HostKeyAlgorithms=+ssh-rsa drone1@<INSERT_IP_ADDRESS>
 
 ```
 
+### 1.3 The Zero-Config Emergency Backdoor (IPv6 Link-Local)
+
+**The Concept:** If static IPv4 configurations fail, you can bypass NetworkManager entirely. The kernel automatically assigns an IPv6 Link-Local address to the physical hardware the moment an Ethernet cable connects.
+
+**Execution:**
+
+1. **Ping the local multicast node** to force the Pi to announce its hardware address over the physical cable (replace `enp8s0` with your PC's ethernet interface):
+```bash
+ping -6 -I enp8s0 ff02::1
+
+```
+
+
+2. **Extract the Address:** Look for the replies starting with `fe80::` that do not belong to your PC. This is the drone.
+3. **SSH via Hardware Scope:** You must append the interface name (`%enp8s0`) to the end of the IP so the SSH client knows which physical cable to push the data through:
+```bash
+ssh drone1@fe80::<INSERT_PI_ADDRESS_HERE>%enp8s0
+
+```
 ---
 
 ## 2. The Ethernet Lifeline (Static Hardwire)
@@ -47,6 +66,9 @@ ssh -o HostKeyAlgorithms=+ssh-rsa drone1@<INSERT_IP_ADDRESS>
 **The Problem:** When configuring Wi-Fi settings via an active Wi-Fi SSH session, applying changes will instantly sever your connection, locking you out of the drone. Furthermore, simply plugging an Ethernet cable between a PC and a Pi fails because there is no router to assign IP addresses (DHCP timeout), causing the port to shut down automatically.
 
 **The Solution:** We enforce a static Point-to-Point (P2P) Ethernet connection. This creates a bulletproof "backdoor" that never drops, regardless of what the Wi-Fi chip is doing.
+
+### Note : 
+This network is already created on drone1 as of Mar 5, 26.
 
 ### 2.1 Execution (Run on Developer PC)
 
@@ -100,6 +122,25 @@ EOF'
 sudo netplan apply
 sudo systemctl restart NetworkManager
 
+```
+### Previous Code inside of 50-cloud-init.yaml file : 
+```
+network:
+  version: 2
+  ethernets:
+    eth0:
+      optional: true
+      dhcp4: true
+  wifis:
+    wlan0:
+      optional: true
+      dhcp4: true
+      regulatory-domain: "IN"
+      access-points:
+        "Palash":
+          auth:
+            key-management: "psk"
+            password: "36d9e8e87138d782816e06988d1731a901e734e94105e25a8c27fdc326bd619a"
 ```
 
 ### 3.2 The Hardware Frequency Constraint
