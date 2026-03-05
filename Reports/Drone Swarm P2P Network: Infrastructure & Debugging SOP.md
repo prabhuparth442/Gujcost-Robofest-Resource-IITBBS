@@ -26,7 +26,10 @@ ssh drone1@<INSERT_IP_ADDRESS>
 
 ```
 
-
+### If on same network you can directly do : 
+```bash
+ssh drone1@drone1.local
+```
 
 ### 1.2 The Legacy RSA Key Error
 
