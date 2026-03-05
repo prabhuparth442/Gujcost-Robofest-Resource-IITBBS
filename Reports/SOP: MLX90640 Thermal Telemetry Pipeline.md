@@ -9,7 +9,9 @@ The 7semi MLX90640 uses the I2C protocol. It requires 4 physical connections to 
 * **SDA (Data):** Pin 3 (GPIO 2)
 * **SCL (Clock):** Pin 5 (GPIO 3)
 
-*(Insert your physical wiring photos here)*
+![RPi 4 Pin Numbering](https://cdn.sparkfun.com/assets/learn_tutorials/1/5/9/5/GPIO.png)
+![Connections Between RPi 4 and MLX9064X](https://images.squarespace-cdn.com/content/v1/59b037304c0dbfb092fbe894/1591731759228-C66M7BWPEH5KPK3UYZ9A/mlx90640_rpi_wiring_diagram_w_table.png)
+
 
 ---
 
