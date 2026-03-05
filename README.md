@@ -66,7 +66,21 @@ Overall aim: a detection-agnostic, safety-first escort system that honestly resp
 - `LICENSE`  
   Repository license.
 
+## ✅ Execution Checklist
 
+- [x] **1. Simulation:** Single Drone in Gazebo.
+- [x] **2. Thermal Sensor:** Finding Resources to support capabilities.
+- [x] **3. Autonomy:** Testing Autonomous movement & Auto-Landing Sequence.
+- [ ] **4. Hardware Build:** Custom drone (Verify weight < 500g & integrate Kill-Switch).
+- [x] **5. Mesh Network:** Rpi - Rpi Communication (P2P Mesh).
+- [ ] **6. Flight Testing:** Custom Drone Flight Dynamics.
+- [ ] **7. Mapping & Detection:** Algorithm, Thermal Sensor, & A4 Map Digitization/Scaling.
+- [ ] **8. Swarm Coordination:** Testing multiple drone coordination.
+- [ ] **9. Master-Slave:** Swarm Testing.
+- [ ] **10. Payload & Movement:** Movement Loop Testing & Visual Marking Payload Deployment.
+- [ ] **11. Dynamic Navigation:** Real-Time Path creation & Human Tracking/Dynamic Re-routing.
+- [ ] **12. Command Input:** Voice & Visual Gesture command control.
+- [ ] **13. Human Interface:** Data Transfer to human phone for viewing the map of the field being created.
 
 ---
 
