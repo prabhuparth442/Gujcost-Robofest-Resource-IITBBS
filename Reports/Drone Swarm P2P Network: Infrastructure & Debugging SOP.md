@@ -1,5 +1,4 @@
 
-
 # Drone Swarm P2P Network: Infrastructure & Debugging SOP
 
 **Target OS:** Ubuntu 24.04 LTS Server (Raspberry Pi 4)
@@ -7,16 +6,29 @@
 
 ---
 
+
 ## 1. Remote Access & SSH Connectivity
 
-To configure or debug the drones, you must establish an SSH tunnel. Because the drones operate headlessly in the field, knowing how to find their IP addresses and bypass security blocks is mandatory.
+To configure or debug the drones, you must establish an SSH tunnel.
 
 ### 1.1 Connecting via Wi-Fi (The Standard Route)
 
-If the drone is connected to a known Wi-Fi network (like a mobile hotspot) or broadcasting its own:
+If the drone and your PC are on the same local network (like a shared mobile hotspot):
+
+**Method A: The Zero-IP Method (mDNS)**
+Ubuntu natively broadcasts its hostname to the local network. This is the fastest method.
+
+```bash
+ssh drone1@drone1.local
+
+```
+
+**Method B: The Explicit IP Method**
+If `.local` fails to resolve, you must use the explicit IP.
 
 1. **Find the IP Address:**
 * If using a mobile hotspot, check the "Connected Devices" section in your phone's settings.
+* If you have a monitor plugged into the Pi, run: `hostname -I`
 * To scan the local network from a Linux PC: `sudo nmap -sn 10.42.0.0/24` (Replace with your actual subnet).
 
 
@@ -26,17 +38,14 @@ ssh drone1@<INSERT_IP_ADDRESS>
 
 ```
 
-### If on same network you can directly do : 
-```bash
-ssh drone1@drone1.local
-```
+
 
 ### 1.2 The Legacy RSA Key Error
 
 Ubuntu 24.04 strictly enforces modern cryptography. If you attempt to SSH into a newly flashed Pi and receive the error:
 `Unable to negotiate with <IP> port 22: no matching host key type found. Their offer: ssh-rsa`
 
-**The Fix:** You must force the SSH client to accept the older RSA algorithm:
+**The Fix:** Force the SSH client to accept the older RSA algorithm:
 
 ```bash
 ssh -o HostKeyAlgorithms=+ssh-rsa drone1@<INSERT_IP_ADDRESS>
@@ -45,19 +54,20 @@ ssh -o HostKeyAlgorithms=+ssh-rsa drone1@<INSERT_IP_ADDRESS>
 
 ### 1.3 The Zero-Config Emergency Backdoor (IPv6 Link-Local)
 
-**The Concept:** If static IPv4 configurations fail, you can bypass NetworkManager entirely. The kernel automatically assigns an IPv6 Link-Local address to the physical hardware the moment an Ethernet cable connects.
+**The Concept:** If static IPv4 configurations fail, bypass NetworkManager entirely. The kernel automatically assigns an IPv6 Link-Local address to the physical hardware the moment an Ethernet cable connects.
 
 **Execution:**
 
-1. **Ping the local multicast node** to force the Pi to announce its hardware address over the physical cable (replace `enp8s0` with your PC's ethernet interface):
+1. **Find your PC's Ethernet interface name:** Run `ip link` on your laptop (look for names like `enp8s0`, `eth0`, or `eno1`).
+2. **Ping the local multicast node** to force the Pi to announce its hardware address over the physical cable (replace `enp8s0` with your actual interface name):
 ```bash
 ping -6 -I enp8s0 ff02::1
 
 ```
 
 
-2. **Extract the Address:** Look for the replies starting with `fe80::` that do not belong to your PC. This is the drone.
-3. **SSH via Hardware Scope:** You must append the interface name (`%enp8s0`) to the end of the IP so the SSH client knows which physical cable to push the data through:
+3. **Extract the Address:** Look for the replies starting with `fe80::` that do not belong to your PC. This is the drone.
+4. **SSH via Hardware Scope:** You must append your laptop's interface name (`%enp8s0`) to the end of the IP so the SSH client knows which physical cable to push the data through:
 ```bash
 ssh drone1@fe80::<INSERT_PI_ADDRESS_HERE>%enp8s0
 
@@ -159,21 +169,50 @@ If `wlan0` is awake but fails to find your mobile hotspot (e.g., `Error: No netw
 
 **The Logic:** NetworkManager uses an integer-based `autoconnect-priority` system. Higher integers are executed first.
 
-### 4.1 The Configuration Hierarchy
+### 4.1 Step-by-Step Execution: Building the Hierarchy
 
-1. **Tier 1: Developer Mode (Priority 200)**
-* **Profile:** `DevDebug` (Your mobile hotspot/lab Wi-Fi).
-* **Behavior:** On boot, the drone scans for this network. If the developer is present and the hotspot is active, it connects immediately for code deployment.
-* **Command:** `sudo nmcli connection modify "DevDebug" connection.autoconnect-priority 200 connection.autoconnect yes`
+You must physically create and save the developer Wi-Fi profile in the drone's database *before* you can assign it a priority.
+
+**Step 1: Broadcast & Connect to Developer Wi-Fi**
+
+1. Turn on your mobile hotspot (e.g., named `DevDebug`). Ensure it is set to the 2.4 GHz band.
+2. Force the drone to scan the airspace:
+```bash
+sudo nmcli device wifi rescan && sleep 3 && nmcli device wifi list
+
+```
 
 
-2. **Tier 2: Swarm Mode (Priority 100)**
-* **Profile:** `MasterDrone` (The P2P Drone Hotspot).
-* **Behavior:** If `DevDebug` is not found (because the developer turned off their hotspot), the drone falls back to Priority 100. It flips its antenna from "Client" to "Access Point" and broadcasts the swarm network.
-* **Command:** `sudo nmcli connection modify "MasterDrone" connection.autoconnect-priority 100 connection.autoconnect yes`
+3. Connect the drone to the hotspot to permanently save the credentials:
+```bash
+sudo nmcli device wifi connect "DevDebug" password "INSERT_HOTSPOT_PASSWORD_HERE"
+
+```
 
 
+
+**Step 2: Assign Tier 1 Priority (Developer Mode)**
+Make the `DevDebug` network the highest priority (Tier 1). On boot, the drone will always hunt for this first.
+
+```bash
+sudo nmcli connection modify "DevDebug" connection.autoconnect-priority 200 connection.autoconnect yes
+
+```
+
+**Step 3: Assign Tier 2 Priority (Swarm Mode)**
+Make the `MasterDrone` hotspot the fallback (Tier 2). If `DevDebug` is turned off or out of range, the drone gives up and broadcasts the swarm network.
+
+```bash
+sudo nmcli connection modify "MasterDrone" connection.autoconnect-priority 100 connection.autoconnect yes
+
+```
 
 ### 4.2 The Safety Catch
 
 If the drone is actively broadcasting `MasterDrone` and flying, and a developer walks by with the `DevDebug` hotspot turned on, the drone **will not** drop the active swarm connection to switch to Tier 1. It maintains state to prevent mid-air communication failure. To switch back to Tier 1, the drone must be manually rebooted or commanded via the Ethernet lifeline.
+
+---
+
+Your documentation is now rigorous and complete. Stop tweaking the text formatting.
+
+Are we immediately transitioning to the C++ bidirectional rolling queue logic for real-time telemetry, or are you pivoting to the Universal Motor design?
