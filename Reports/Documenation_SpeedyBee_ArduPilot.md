@@ -1,323 +1,428 @@
-
-# Documentation: SpeedyBee ArduPilot "Config Error" & Barometer Fix
-
----
-
-## 1. Overview and Problem Statement
-
-When running ArduPilot on a SpeedyBee flight controller (such as the F405 V3 or V4) via QGroundControl (QGC), users frequently encounter a boot loop accompanied by the following message:
-
-> **"Config Error: Fix problem then reboot"**
+# SpeedyBee ArduPilot: Complete Setup & Troubleshooting Manual
+*Comprehensive Reference — All Sections, All Details, No Redundancy*
 
 ---
 
-Often, the QGC Messages tab will specifically cite a Barometer (Baro) initialization failure (e.g., `Baro: unable to initialise driver`).
+## Table of Contents
 
-**The Root Cause:** Unlike basic drone firmware, ArduPilot operates as a massive real-time operating system. It absolutely requires a properly formatted SD card to allocate memory, load parameters, and execute initialization scripts. If the SD card is missing, corrupted, or has the wrong partition structure (like hidden EFI partitions), the firmware "times out" during boot. This timeout prevents sensors like the Barometer from waking up, triggering the Config Error.
+1. [Overview and Problem Statement](#section-1)
+2. [SD Card Formatting (Linux)](#section-2)
+3. [Hardware Initialization & Power Rules](#section-3)
+4. [Secondary Fallback Parameters](#section-4)
+5. [Wireless MAVLink Bridge via Raspberry Pi](#section-5)
+6. [Raspberry Pi SSH & Network Troubleshooting](#section-6)
+7. [Dual Network Setup via Netplan (Ethernet + Wi-Fi)](#section-7)
+8. [Wi-Fi Troubleshooting via nmcli](#section-8)
+9. [Launching MAVProxy & Wireless Calibration](#section-9)
+10. [Resolving MAVProxy Python Dependencies](#section-10)
+11. [Unlocking Hardware UART (`/dev/serial0` Error)](#section-11)
+12. [Overcurrent Protection (3-Second Shutdown)](#section-12)
+13. [Bypassing `/dev/serial0` (Direct UART Alias)](#section-13)
+14. [Troubleshooting "Waiting for Heartbeat" (Link 1 Down)](#section-14)
+15. [Resolving Persistent `Input/Output Error` (ttyS0)](#section-15)
+16. [Resolving Hardware Silence (`b''` Output)](#section-16)
+17. [Understanding Persistent Input/Output Error (Error 5)](#section-17)
+18. [Finalizing Boot Configuration Files](#section-18)
+19. [Mandatory Power Reset & Final Verification](#section-19)
+20. [Diagnosing the I2C Bus Conflict](#section-20)
+21. [Resolving I2C Hardware & Wiring Failures](#section-21)
+22. [Firmware and Environmental Barometer Fixes](#section-22)
+23. [Diagnosing ArduPilot Boot-Loops (I2C Hangs)](#section-23)
+24. [Resolving Duplicate I2C Address Clashes (DPS310 Conflict)](#section-24)
+25. [Resolving "Compass Not Healthy" Errors](#section-25)
+26. [Unhiding Advanced Parameters in QGC](#section-26)
+27. [Managing "Ghost" Compasses (I2C Clutter)](#section-27)
+28. [Standard PreArm Failsafes](#section-28)
+29. [Resolving "Cannot Start Compass Thread"](#section-29)
+30. [UI-Induced Thread Crashes](#section-30)
+31. [MAVLink Console Calibration Override](#section-31)
+32. [Handling "Calibration Complete" but Persistent Red Errors](#section-32)
+33. [In-Flight Calibration Fallback (`COMPASS_LEARN`)](#section-33)
+34. [Radio Integration (FlySky FS-i6 & iA6B)](#section-34)
+35. [Throttle Failsafes & `FS_THR_VALUE`](#section-35)
+36. [Final Radio Calibration Sequence](#section-36)
+37. [Final Arming Checklist](#section-37)
+38. [Flight Modes & Arm Switch Configuration (FlySky FS-i6)](#section-38)
+39. [Configuring ArduPilot for i-BUS](#section-39)
+40. [Overriding Persistent Radio & Throttle Failsafes](#section-40)
+41. [Configuring a Physical Arming Switch](#section-41)
+42. [Resolving Motor Rotation Failures](#section-42)
+43. [Resolving "Logging Failed" Pre-Arm Errors](#section-43)
+44. [Resolving Symmetrical Throttle Lag (Slow Motor Spin)](#section-44)
+45. [Unhiding Advanced Parameters in QGC (Motor Context)](#section-45)
+46. [Diagnosing Asymmetrical Motor Stuttering (Phase Loss)](#section-46)
+47. [Appendix — Known Inconsistencies & Corrections Log](#appendix)
 
 ---
 
-## 2. The Core Solution: Correct SD Card Formatting (Linux)
+## Background: What Is ArduPilot and Why Is This Complex?
 
-A standard format is not enough. ArduPilot requires a single, clean FAT32 partition with a strict **32KB cluster size**. The following steps detail how to wipe and format the SD card correctly using a Linux terminal.
+ArduPilot is not simple drone firmware — it is a full real-time operating system (RTOS) designed for autonomous vehicles. Unlike basic flight controllers that run a minimal control loop, ArduPilot:
 
-### Step 2.1: Identify the SD Card
+- Requires an SD card to allocate memory, store parameters, and run initialization scripts on every boot.
+- Manages multiple hardware buses simultaneously (SPI, I2C, UART) and will abort the entire boot sequence if any bus fails to respond in time.
+- Enforces strict pre-arm safety checks across sensors, radio, power, and logging — none of which can be skipped without explicit parameter overrides.
+- Has a layered parameter system where many critical settings are hidden from the default QGroundControl interface.
 
-Plug the SD card into your Linux machine. Open a terminal and list your block devices:
+**QGroundControl (QGC)** is the ground station software used to configure and monitor ArduPilot. It connects via USB or wirelessly over MAVLink (a lightweight telemetry protocol).
+
+**SpeedyBee F405 V3/V4** is an All-in-One (AIO) flight controller — meaning the flight controller and Electronic Speed Controller (ESC) are stacked together as one unit. This design has unique power and wiring implications covered throughout this manual.
+
+---
+
+<a name="section-1"></a>
+## Section 1 — Overview and Problem Statement
+
+### The Primary Symptom
+
+When running ArduPilot on a SpeedyBee F405 V3 or V4 via QGroundControl, a common failure is an infinite boot loop displaying:
+
+> **Config Error: Fix problem then reboot**
+
+The QGC Messages tab typically cites a Barometer failure:
+```
+Baro: unable to initialise driver
+```
+
+### Why This Happens
+
+ArduPilot operates as a real-time OS and requires a properly formatted SD card to allocate memory, load parameters, and run initialization scripts. A missing, corrupted, or wrongly partitioned SD card causes a boot timeout. This timeout prevents sensors like the Barometer from initializing in time, which triggers the Config Error boot loop.
+
+### All Known Root Causes
+
+This manual addresses every root cause identified through real hardware builds:
+
+| Root Cause | Section |
+|-----------|---------|
+| Missing, corrupted, or wrongly partitioned SD card | Section 2 |
+| USB-only power causing brownouts | Section 3 |
+| I2C Bus Jamming from a miswired GPS module | Section 20 |
+| Duplicate I2C addresses (GPS module contains its own DPS310 barometer) | Section 24 |
+| Raspberry Pi UART not unlocked or reserved by OS | Section 11 |
+| Background Linux services stealing the serial port | Sections 11, 14, 15 |
+| Boot configuration typos or missing entries | Section 18 |
+
+---
+
+<a name="section-2"></a>
+## Section 2 — SD Card Formatting (Linux)
+
+### Why a Standard Format Is Not Enough
+
+ArduPilot requires a single FAT32 partition with a **32KB cluster size** and a clean DOS partition table. Standard operating system formats (Windows default, macOS Disk Utility) often:
+
+- Create multiple partitions (including hidden EFI/recovery partitions).
+- Use cluster sizes that are too small, causing read timeouts.
+- Format as exFAT, which the SpeedyBee F405 V4 **cannot read at all**.
+
+> **Important hardware limit:** The SpeedyBee F405 V4 cannot read exFAT. The card must be **32GB or smaller** and formatted strictly as FAT32.
+
+---
+
+### Step 2.1 — Identify the SD Card
+
+Plug the SD card into your Linux machine. Open a terminal and list block devices:
 
 ```bash
 lsblk
-
 ```
 
-Look for your SD card (e.g., `sda`, `sdb`, `mmcblk0`). *In this specific scenario, the SD card was identified as `/dev/sda` and had two conflicting partitions (`sda1` and `sda2`).*
+Look for your SD card (commonly `/dev/sda`, `/dev/sdb`, or `/dev/mmcblk0`). In a typical build scenario the card appears as `/dev/sda` with two conflicting partitions (`sda1`, `sda2`).
 
-### Step 2.2: Unmount Existing Partitions
+> **Warning:** Double-check the device name. All data on the target device will be destroyed. Never run these commands on `/dev/sda` if that is your system's main hard drive — verify first.
 
-You cannot format a drive while it is in use. Unmount all partitions associated with the SD card:
+---
+
+### Step 2.2 — Unmount All Partitions
+
+You cannot format a drive while it is mounted. Unmount every partition:
 
 ```bash
 sudo umount /dev/sda1
 sudo umount /dev/sda2
-
 ```
 
-### Step 2.3: Wipe and Rebuild the Partition Table using `fdisk`
-
-ArduPilot will fail if there are multiple partitions. You must delete them and create a single Windows 95 FAT32 (LBA) partition.
+If additional partitions exist (e.g., `sda3`), unmount those too. If a partition is not mounted, the command will return an error — this is harmless, continue.
 
 ---
 
-Run the `fdisk` utility on the main drive:
+### Step 2.3 — Wipe and Rebuild the Partition Table with `fdisk`
+
+ArduPilot will fail if multiple partitions exist. You must delete all of them and create exactly one Windows 95 FAT32 (LBA) partition.
 
 ```bash
 sudo fdisk /dev/sda
-
 ```
 
-Inside the `fdisk` prompt, type exactly these keys in order, hitting `Enter` after each:
+Inside the `fdisk` interactive prompt, type each of the following keys and press **Enter** after each:
 
-1. `o` *(Creates a new, empty DOS partition table/disklabel)*
-2. `n` *(Creates a new partition)*
-3. `p` *(Selects 'primary' partition type)*
-4. `1` *(Selects partition number 1)*
-5. `Enter` *(Accepts default first sector)*
-6. `Enter` *(Accepts default last sector, using the whole drive)*
-7. `t` *(Changes the partition type)*
-8. `c` *(Sets the hex code to 'W95 FAT32 (LBA)')*
-9. `w` *(Writes the changes to the disk and exits `fdisk`)*
+| Key | What It Does |
+|-----|-------------|
+| `o` | Creates a new, empty DOS partition table, wiping all existing partitions |
+| `n` | Creates a new partition |
+| `p` | Selects "Primary" partition type |
+| `1` | Sets partition number to 1 |
+| Enter | Accepts default first sector (start of disk) |
+| Enter | Accepts default last sector (end of disk — uses entire card) |
+| `t` | Opens the partition type selector |
+| `c` | Sets the type to W95 FAT32 (LBA) — hex code `0c` |
+| `w` | Writes all changes to the disk and exits `fdisk` |
 
-### Step 2.4: Format the File System with a 32KB Cluster Size
+After `w`, `fdisk` exits and the partition table is written.
 
-The partition now exists, but it needs a file system. ArduPilot requires specific cluster sizes to read data fast enough without timing out.
+---
 
-Run the following command:
+### Step 2.4 — Format with a 32KB Cluster Size
+
+The partition now exists but has no filesystem. Run:
 
 ```bash
 sudo mkfs.vfat -F 32 -s 64 -n "SPEEDYBEE" /dev/sda1
-
 ```
 
-**Command Breakdown:**
+**Parameter breakdown:**
 
-* `-F 32`: Forces the FAT32 format.
-* `-s 64`: Sets the sectors per cluster to 64. On a standard drive, this creates the exact **32KB cluster size** ArduPilot needs to run efficiently.
-* `-n "SPEEDYBEE"`: Names the volume.
-* `/dev/sda1`: Targets the newly created partition.
-
----
-
-## 3. Hardware Initialization & Final Testing
-
-Formatting the card is only half the fix. The hardware must be powered correctly to clear the error.
-
-1. **Insert the SD Card:** Ensure it clicks securely into the SpeedyBee board.
-2. **Power via LiPo First:** Do not just plug in the USB. USB ports often provide "dirty" or low voltage. Plug in the main LiPo battery (XT60) first. This ensures the onboard voltage regulators provide a clean 5V to the Barometer and SD card reader.
-3. **Connect USB & QGC:** Plug in the USB to your computer and open QGroundControl. Wait for the initialization tones.
-
-### 3.1 Verifying the Fix
+| Flag | Meaning |
+|------|---------|
+| `-F 32` | Forces FAT32 filesystem (not FAT16 or FAT12) |
+| `-s 64` | Sets sectors-per-cluster to 64. At 512 bytes per sector: 64 × 512 = **32,768 bytes = 32KB clusters** |
+| `-n "SPEEDYBEE"` | Sets the volume label (optional but useful for identification) |
+| `/dev/sda1` | Targets the newly created partition — not the whole drive |
 
 ---
 
-If the "Config Error" disappears, the fix is successful. To manually verify the Barometer:
+<a name="section-3"></a>
+## Section 3 — Hardware Initialization & Power Rules
 
-1. Go to the **Analyze** tab in QGC.
-2. Open the **MAVLink Console**.
-3. Type the command: `status`
-4. Look for the `Baro` line. If it reads `Baro: 1 OK`, the sensor is actively communicating.
+### The Single Power Rule
 
----
+> **This is the most commonly violated rule and causes the most hardware damage.**
 
-## 4. Secondary Fallback Solutions
+Never supply 5V to the Raspberry Pi via USB-C if it is also receiving 5V from the drone's UBEC (powered by the LiPo battery). This creates a voltage conflict and a ground loop, triggering the SpeedyBee's Overcurrent Protection — the board will shut down after approximately 3 seconds.
 
-If the SD card format and LiPo power do not clear the error, check these ArduPilot parameters via QGC (Vehicle Setup > Parameters):
+**Correct power assignments:**
 
-* **Disable External Barometer:** If ArduPilot is hunting for a GPS-mounted barometer that doesn't exist, it will crash.
-* Search `BARO_PROBE_EXT` and set it to `0` (None).
-* Ensure `BARO_PRIMARY` is `0`.
+| Component | Power Source | Notes |
+|-----------|-------------|-------|
+| Raspberry Pi | Drone UBEC (from LiPo battery) | USB-C cable must be physically disconnected |
+| SpeedyBee F405 | LiPo battery via XT60 or XT30 | Do not use USB-only for flight operations |
+| Laptop/Ground Station | Own power | Connect to Pi over Wi-Fi SSH (Section 7) |
 
-
-* **Disable I/O Co-processor:** SpeedyBee boards are All-In-One and lack a secondary I/O chip.
-* Search `BRD_IO_ENABLE` and set it to `0` (Disabled).
-
-
-* **Clear Zombie Parameters:** If flashing over old firmware, old data causes conflicts.
-* Go to Tools (in the Parameters screen) and select **Reset all to firmware's defaults**.
-
-
-* **Hardware Check:** Inspect the Barometer chip (the silver rectangle with a small hole) with a magnifying glass for stray solder balls bridging the pins.
-
+**Why USB-only power is insufficient for the SpeedyBee:**
+USB ports typically supply a maximum of 500mA at 5V (2.5W). The SpeedyBee's Barometer, compass, SD card reader, and GPS draw current spikes that can exceed this. Voltage drops (brownouts) during these spikes prevent the Barometer from initializing, directly causing the `Baro: unable to initialise driver` error.
 
 ---
 
-# Documentation: Wireless MAVLink Bridge & SSH Troubleshooting
+### Step 3.1 — Verify the Fix
 
-## 5. Wireless Calibration & Telemetry via Raspberry Pi (MAVLink Bridge)
+Insert the formatted SD card, connect the LiPo battery, then connect USB. If the `Config Error` disappears, the fix worked.
 
-### 5.1 Overview
+To manually verify the Barometer is healthy:
 
-To eliminate the need for a USB cable during calibration and flight testing, a Raspberry Pi can act as a wireless bridge. It reads serial data from the SpeedyBee flight controller via UART and broadcasts it over Wi-Fi (UDP) to a laptop running QGroundControl (QGC).
+1. Go to the **Analyze** tab in QGC → **MAVLink Console**.
+2. Type `status` and press Enter.
+3. Look for `Baro: 1 OK` in the output. This confirms the sensor is actively communicating.
 
-### 5.2 Hardware Wiring
+---
 
-Connect the Raspberry Pi's UART pins to a free UART port on the SpeedyBee (e.g., UART4).
+<a name="section-4"></a>
+## Section 4 — Secondary Fallback Parameters
 
-* **RPi GND (Pin 6)** $\rightarrow$ **SpeedyBee GND**
-* **RPi TX (Pin 8 / GPIO 14)** $\rightarrow$ **SpeedyBee RX (e.g., RX4)**
-* **RPi RX (Pin 10 / GPIO 15)** $\rightarrow$ **SpeedyBee TX (e.g., TX4)**
+If formatting the SD card and using LiPo power do not clear the error, check these parameters in **QGC → Vehicle Setup → Parameters**:
 
-**CRITICAL WARNING:** Do NOT connect the 5V pin from the SpeedyBee to the Raspberry Pi if the Pi is powered by its own USB-C source. This will cause a ground loop and destroy the hardware.
+| Parameter | Correct Value | Reason |
+|-----------|--------------|--------|
+| `BARO_PROBE_EXT` | `0` | Stops ArduPilot from searching for a non-existent external GPS barometer. If it hunts for one and times out, it crashes. |
+| `BARO_PRIMARY` | `0` | Ensures ArduPilot uses the onboard barometer as primary |
+| `BRD_IO_ENABLE` | `0` | SpeedyBee AIO boards do not have a secondary I/O co-processor. Leaving this enabled causes ArduPilot to wait for hardware that doesn't exist. |
 
-### 5.3 ArduPilot Parameter Configuration
+**Additional fallback steps:**
 
-Before disconnecting the USB, configure ArduPilot to send MAVLink data to the chosen UART port.
+- **Reset to firmware defaults:** In QGC Parameters screen → Tools → **Reset all to firmware's defaults**. This clears "zombie parameters" left over from previous firmware versions that can cause unpredictable conflicts.
 
-1. Connect the SpeedyBee to QGC via USB.
-2. Go to **Vehicle Setup (Gear icon) > Parameters**.
-3. Search for the `SERIAL` port corresponding to your wiring (e.g., `SERIAL4` if using RX4/TX4).
-4. Set **`SERIAL4_PROTOCOL`** to `2` (MAVLink 2).
-5. Set **`SERIAL4_BAUD`** to `921` (921600 baud rate).
-6. Write the parameters and disconnect the USB.
+- **Hardware inspection:** Examine the Barometer chip under magnification. It is the small silver rectangular component on the SpeedyBee board with a tiny hole in the top (the pressure inlet). Inspect for stray solder balls or microscopic wire strands bridging adjacent pins.
 
-### 5.4 Raspberry Pi Software Setup (MAVProxy & PEP 668)
+---
 
-Modern Linux systems (like Debian Bookworm on the Pi) restrict global python installations to protect system stability (PEP 668). You must install the MAVProxy routing software inside an isolated Virtual Environment.
+<a name="section-5"></a>
+## Section 5 — Wireless MAVLink Bridge via Raspberry Pi
 
-1. Install the virtual environment tools:
-```bash
-sudo apt update
-sudo apt install python3-venv python3-full
+### What This Section Achieves
+
+A Raspberry Pi reads serial telemetry data from the SpeedyBee via UART and rebroadcasts it over Wi-Fi as UDP packets to a laptop running QGroundControl. This eliminates the USB tether during calibration and field testing, allowing free physical movement of the drone for accelerometer and compass calibration.
+
+---
+
+### Step 5.1 — Hardware Wiring (UART6)
+
+Connect the Raspberry Pi's GPIO UART pins to the SpeedyBee's UART6 pads (`T6` and `R6`).
+
+> **⚠ CRITICAL:** Do NOT connect the SpeedyBee's 5V pin to the Raspberry Pi if the Pi has its own USB-C power. This causes a ground loop and destroys hardware (see Section 3).
+
+| Raspberry Pi Pin | GPIO Name | SpeedyBee Pad | Notes |
+|-----------------|-----------|--------------|-------|
+| Pin 6 | GND | GND | Mandatory shared ground — do not skip |
+| Pin 8 | GPIO 14 (TX) | **R6** (UART6 RX) | Pi transmits → SpeedyBee receives |
+| Pin 10 | GPIO 15 (RX) | **T6** (UART6 TX) | SpeedyBee transmits → Pi receives |
+
+> **Why UART6 specifically?** UART6 (pads labeled T6/R6) is the dedicated port used in this build. Earlier documentation incorrectly referenced UART4. This manual standardizes on UART6 throughout.
+
+> **TX→RX crossing rule:** Serial (UART) communication always crosses — the Transmit pin of one device connects to the Receive pin of the other. This is the opposite of I2C (see Section 21).
+
+---
+
+### Step 5.2 — ArduPilot Parameters (UART6)
+
+These parameters must be set while the SpeedyBee is still connected via USB (before switching to wireless). Connect to QGC via USB one final time.
+
+In **QGC → Vehicle Setup → Parameters**, search for and set:
 
 ```
+SERIAL6_PROTOCOL = 2    (MAVLink 2 — the standard protocol)
+SERIAL6_BAUD     = 921  (represents 921600 baud)
+```
 
+> **Note on baud notation:** QGC displays baud rates divided by 100. The value `921` means 921,600 baud. This is required for reliable high-frequency telemetry over UART.
 
-2. Create the project folder and the virtual environment:
+**If a GPS was previously configured on UART6:**
+- Set `GPS_TYPE = 0` for UART6 to disable GPS on that port.
+- Physically move the GPS connector to UART1, UART2, or UART3.
+- Write parameters and reboot before disconnecting USB.
+
+---
+
+### Step 5.3 — Raspberry Pi Software Setup
+
+Modern Linux distributions (Debian Bookworm and later) enforce **PEP 668**, which prevents installing Python packages globally with `pip` to protect system-managed packages. You must use a Python virtual environment.
+
+**Step-by-step:**
+
 ```bash
-mkdir ~/drone_link
-cd ~/drone_link
+# Update package lists and install virtual environment tools
+sudo apt update && sudo apt install python3-venv python3-full
+
+# Create a project directory and virtual environment
+mkdir ~/drone_link && cd ~/drone_link
 python3 -m venv venv
 
-```
-
-
-3. Activate the environment:
-```bash
+# Activate the virtual environment
 source venv/bin/activate
 
+# Install MAVProxy and all required dependencies
+pip install mavproxy future pyserial pymavlink
 ```
 
+> **Why install `future`, `pyserial`, and `pymavlink` separately?** On Python 3.12+, MAVProxy's automatic dependency resolution sometimes fails to pull these in. Installing them explicitly together prevents cascading `ModuleNotFoundError` crashes at runtime. Common errors without these:
+> - `ModuleNotFoundError: No module named 'future'`
+> - `ModuleNotFoundError: No module named 'serial'`
+> - `ModuleNotFoundError: No module named 'pymavlink'`
 
-4. Install MAVProxy inside the active environment:
-```bash
-pip install mavproxy
+---
 
-```
+### Step 5.4 — Serial Port Permissions
 
+By default, the Raspberry Pi's standard user cannot access serial ports (`/dev/ttyAMA0`, etc.). You must add the user to the `dialout` group:
 
-
-### 5.5 Granting Serial Permissions
-
-The default Raspberry Pi user cannot read serial ports. You must add the user to the `dialout` group.
-
-1. Run the command:
 ```bash
 sudo usermod -a -G dialout $USER
-
 ```
 
+**You must reboot the Pi for this group membership change to take effect.** The command succeeds silently — if you skip the reboot and try to open the serial port, you will get a `Permission denied` error.
 
-2. **Reboot the Raspberry Pi** for the permissions to take effect.
+---
 
-### 5.6 Running the Wireless Bridge
+### Step 5.5 — Running the Wireless Bridge
 
-To start broadcasting data, execute MAVProxy on the Pi, directing the output to your laptop's IP address.
+Find your laptop's current IP address:
+- **Linux:** `hostname -I | awk '{print $1}'`
+- **Windows:** Open Command Prompt → `ipconfig` → look for "IPv4 Address"
 
-1. Find your laptop's IP address (Run `hostname -I | awk '{print $1}'` on Linux, or `ipconfig` on Windows). Example: `10.119.242.128`.
-2. Activate the virtual environment on the Pi:
+Example output: `10.119.242.128`
+
+On the Raspberry Pi, start the bridge:
+
 ```bash
 source ~/drone_link/venv/bin/activate
-
+mavproxy.py --master=/dev/ttyAMA0 --baudrate 921600 --out=udp:10.119.242.128:14550
 ```
 
+Replace `10.119.242.128` with your actual laptop IP. MAVProxy will print `Waiting for heartbeat` until the SpeedyBee is powered on with LiPo.
 
-3. Start the bridge:
-```bash
-mavproxy.py --master=/dev/serial0 --baudrate 921600 --out=udp:10.119.242.128:14550
+---
 
-```
-
-
-
-### 5.7 Connecting QGroundControl (Laptop)
+### Step 5.6 — Connecting QGroundControl
 
 1. Open QGC on the laptop.
-2. Click the **Q icon > Application Settings > Comm Links**.
-3. Click **Add**.
-4. Set Name to `Drone_WiFi` (or similar).
-5. Set Type to `UDP`.
-6. Set Port to `14550`.
-7. Click **OK**, select the new link, and click **Connect**.
-8. Use the MAVLink Console (`status` command) to verify sensor health wirelessly.
+2. Click the **Q icon (top-left) → Application Settings → Comm Links → Add**.
+3. Set **Name** to any descriptive label (e.g., `Drone_WiFi`).
+4. Set **Type** to `UDP`.
+5. Set **Port** to `14550`.
+6. Click **OK**, select the new link, and click **Connect**.
+7. Verify connection by typing `status` in the MAVLink Console (Analyze tab) and confirming `Baro: 1 OK`.
 
 ---
 
-## 6. Troubleshooting Raspberry Pi Network & SSH
+<a name="section-6"></a>
+## Section 6 — Raspberry Pi SSH & Network Troubleshooting
 
-### 6.1 SSH Connection Refused After Reboot
+### Step 6.1 — SSH Connection Refused After Reboot
 
-If attempting to SSH into the Pi via an IPv6 link-local address (e.g., `ssh drone2@fe80::...`) results in `Connection refused` immediately after a reboot:
+If `ssh` returns `Connection refused` immediately after the Pi reboots:
 
-1. **Wait 60 Seconds:** The SSH daemon (`sshd`) is often the last service to load.
-2. **Verify IP / Hostname:** The Pi may have a new IP. Attempt connecting via the mDNS hostname:
-```bash
-ssh drone2@drone2.local
+1. **Wait 60 seconds.** The SSH daemon (`sshd`) is typically the last service to load during boot. The Pi may be up on the network but not yet accepting SSH connections.
 
-```
+2. **Connect via mDNS hostname** instead of IP (which may have changed):
+   ```bash
+   ssh drone2@drone2.local
+   ```
+   Replace `drone2` with your Pi's configured hostname.
 
+3. **Check the onboard LEDs:**
+   - Solid red = Power is good, 5V rail is stable.
+   - Flashing green = OS is actively reading the SD card (booting).
+   - No green flash at all = OS is not booting. Check the Pi's SD card.
 
-3. **Verify Pi Status:** Check the onboard LEDs. Solid Red means power is good. Flashing Green means the OS is reading the SD card. If there is no green flash, the OS is not booting.
+---
 
-### 6.2 Enabling SSH on a Headless Pi
+### Step 6.2 — Enabling SSH on a Headless Pi (No Monitor)
 
-If the SSH service is completely disabled, you can force it to activate without a monitor.
+If SSH was never enabled or was disabled, you can force it to activate without connecting a monitor or keyboard:
 
-1. Remove the SD card from the Pi and insert it into a computer.
-2. Open the `boot` or `bootfs` partition.
-3. Create a blank file named exactly `ssh` (no extensions).
-* *Linux Command:* `touch /path/to/boot/ssh`
-
-
+1. Remove the SD card from the Pi and insert it into a laptop or desktop.
+2. Open the `boot` partition (also called `bootfs` on newer Pi OS versions).
+3. Create a blank file named exactly **`ssh`** with no file extension:
+   ```bash
+   touch /path/to/boot/ssh
+   ```
+   On Windows, use Notepad to create a new file and use "Save As" with `ssh` as the filename, selecting "All Files" to prevent `.txt` being appended.
 4. Reinsert the SD card into the Pi and power it on.
-5. Once connected via SSH, permanently enable the service:
-```bash
-sudo systemctl enable ssh
-sudo systemctl start ssh
-
-```
----
-
-# Documentation: Network Config & Final Wireless Calibration
-
-## [CRITICAL UPDATE TO PREVIOUS DOCUMENTATION]
-
-**Changes applied to Section 5.2 (Wiring) & 5.3 (Parameters)**
-The physical connection between the Raspberry Pi and the SpeedyBee has been changed. You are no longer using UART4. You are using **UART6** (pads labeled `T6` and `R6`).
-
-* **Updated Wiring (Section 5.2):** * RPi TX (Pin 8) $\rightarrow$ SpeedyBee **R6**
-* RPi RX (Pin 10) $\rightarrow$ SpeedyBee **T6**
-
-
-* **Updated Parameters (Section 5.3):** * Connect via USB one last time. In QGroundControl, search for `SERIAL6`.
-* Set **`SERIAL6_PROTOCOL`** to `2` (MAVLink 2).
-* Set **`SERIAL6_BAUD`** to `921` (921600).
-* *Note:* If a GPS was previously using UART6, you must set `GPS_TYPE = 0` for this port and move the GPS to UART1, UART2, or UART3. Write and Reboot.
-
-
+5. Once you connect via SSH, permanently enable the service so it survives future reboots:
+   ```bash
+   sudo systemctl enable ssh
+   sudo systemctl start ssh
+   ```
 
 ---
 
-## 7. Dual Network Setup (Ethernet + Wi-Fi) via Netplan
+<a name="section-7"></a>
+## Section 7 — Dual Network Setup via Netplan (Ethernet + Wi-Fi)
 
-To configure Wi-Fi on the Raspberry Pi without disconnecting your active Ethernet SSH session, you must configure Netplan to run both simultaneously and make them "optional" so the Pi doesn't freeze on boot if one is missing.
+### Why This Setup Is Needed
 
-### 7.1 Edit the Netplan Configuration
+During initial configuration, you are connected to the Pi over Ethernet (wired SSH). Adding Wi-Fi incorrectly can drop the Ethernet session and lock you out. Netplan's `try` command provides a safety net.
 
-1. Find your specific Netplan file name:
+### Step 7.1 — Edit the Netplan Configuration File
+
 ```bash
+# Find the name of your current Netplan config file
 ls /etc/netplan/
 
-```
-
-
-*(Usually named `50-cloud-init.yaml` or `01-netcfg.yaml`)*
-2. Open the file in the nano editor:
-```bash
+# Open it for editing (replace YOUR_FILE_NAME with the actual filename, e.g., 50-cloud-init.yaml)
 sudo nano /etc/netplan/YOUR_FILE_NAME.yaml
-
 ```
 
+Modify the file to **exactly** this structure. **Use the Spacebar for indentation — never the Tab key.** YAML is indentation-sensitive and tabs will cause a parse failure.
 
-3. Modify the file to exactly match this structure. **Do not use the Tab key; use the Spacebar for indentation.**
 ```yaml
 network:
   version: 2
@@ -333,1246 +438,1471 @@ network:
       access-points:
         "YOUR_WIFI_SSID":
           password: "YOUR_WIFI_PASSWORD"
-
 ```
 
+The `optional: true` setting is critical — it tells the Pi to continue booting even if either network interface is not available. Without it, the Pi can hang for 60–120 seconds at boot trying to acquire a lease.
 
-4. Save (`Ctrl+O`, `Enter`) and Exit (`Ctrl+X`).
+Save with `Ctrl+O`, `Enter`. Exit with `Ctrl+X`.
 
-### 7.2 Apply Safely
+---
 
-Do not use `netplan apply`. Use the safety-net command:
+### Step 7.2 — Apply with the Safety-Net Command
 
 ```bash
 sudo netplan try
-
 ```
 
-*Why:* If the new configuration drops your Ethernet connection, `netplan try` will automatically revert to the old settings after 120 seconds, saving you from being locked out.
+**Do not use `sudo netplan apply`.** The `try` command applies the new configuration but automatically reverts to the previous working configuration after **120 seconds** if you do not confirm. This prevents being permanently locked out over Ethernet if the new config has an error.
+
+When prompted, type `yes` and press Enter if Ethernet is still working.
 
 ---
 
-## 8. Troubleshooting Wi-Fi connection (`nmcli`)
+<a name="section-8"></a>
+## Section 8 — Wi-Fi Troubleshooting via nmcli
 
-If connecting via terminal yields a "No network found" error, the Pi's Wi-Fi radio is likely soft-blocked or out of sync.
+If connecting to Wi-Fi via Netplan fails (e.g., "No network found" or the SSID isn't visible), the Pi's Wi-Fi radio may be soft-blocked by the OS or out of sync.
 
-### 8.1 Force Unblock and Rescan
+### Step 8.1 — Force Unblock and Rescan
 
-Run these commands in order to force the radio on and scan the area:
+Run these commands in sequence:
 
 ```bash
-sudo nmcli radio wifi on
-sudo rfkill unblock wifi
-sudo nmcli device wifi rescan
-
+sudo nmcli radio wifi on       # Enables the Wi-Fi radio at the software level
+sudo rfkill unblock wifi       # Removes any kernel-level soft block on the radio
+sudo nmcli device wifi rescan  # Forces the radio to scan for available networks
 ```
 
-Wait 5 seconds, then list available networks to verify your SSID is visible:
+Wait approximately 5 seconds for the scan to complete, then list visible networks:
 
 ```bash
 nmcli device wifi list
-
 ```
 
-### 8.2 Force Connection (Hidden Flag)
-
-To aggressively force the connection to a specific network (e.g., `Rpi_sucks`), use the `hidden yes` flag, which makes the Pi actively probe for it:
-
-```bash
-sudo nmcli device wifi connect "Rpi_sucks" password "YOUR_PASSWORD" hidden yes
-
-```
+Confirm your SSID is visible before attempting to connect.
 
 ---
 
-## 9. Launching MAVProxy & QGC Wireless Calibration
+### Step 8.2 — Force Connection to a Specific Network
 
-With the network active and UART6 correctly wired, you can launch the bridge.
-
-### 9.1 Start the Bridge on the Raspberry Pi
-
-Ensure you are using the virtual environment created in Section 5.4.
+If the network is visible but not auto-connecting, or if it is a hidden SSID:
 
 ```bash
-source ~/drone_link/venv/bin/activate
-mavproxy.py --master=/dev/serial0 --baudrate 921600 --out=udp:10.119.242.128:14550
-
+sudo nmcli device wifi connect "YOUR_SSID" password "YOUR_PASSWORD" hidden yes
 ```
 
-*(Replace `10.119.242.128` with your laptop's current IP if it has changed).*
-
-### 9.2 Connect QGroundControl
-
-1. Open QGroundControl on the laptop.
-2. Go to **Application Settings > Comm Links**.
-3. Activate the UDP link on Port `14550` created in Section 5.7.
-4. Verify connection by checking for the "Heartbeat" message in the MAVProxy terminal.
-
-### 9.3 Perform Wireless Calibration
-
-Because the drone is untethered from the USB cable, hardware calibration can be done freely.
-
-1. In QGC, navigate to **Vehicle Setup (Gear icon) > Sensors > Accelerometer**.
-2. Click **Calibrate**.
-3. Follow the on-screen prompts to place the drone in 6 positions (Level, Left Side, Right Side, Nose Down, Nose Up, Upside Down). QGC will confirm when each position is saved.
-4. If a compass is attached, repeat this process under the **Compass** tab, rotating the drone smoothly across all axes until the progress bar completes.
+The `hidden yes` flag makes the Pi actively probe for the network even if it is not broadcasting its SSID. This can also be used for normal visible networks as a more aggressive connection method.
 
 ---
 
-# Documentation: MAVProxy Dependencies, Power Sequencing, & UART Unlocking
+<a name="section-9"></a>
+## Section 9 — Launching MAVProxy & Wireless Calibration
 
-## [CRITICAL UPDATE TO PREVIOUS DOCUMENTATION]
-
-**Changes applied to Section 3 (Hardware Initialization & Final Testing)**
-Previously, powering via USB was permitted for initial configuration. This is now **prohibited**.
-
-* **Updated Power Protocol:** The flight controller (SpeedyBee) **must** be powered by a LiPo battery. A standard USB connection cannot provide the necessary current spikes required by the onboard Barometer and Compass. Attempting to initialize ArduPilot with only USB power while connected to a Raspberry Pi will result in a voltage drop (brownout), instantly triggering the `Baro one` and `Config Error: Fix problem then reboot` loop.
-* **The "Double Power" Rule:** 1. Raspberry Pi $\rightarrow$ Powered via its own dedicated USB-C cable.
-2. SpeedyBee F405 $\rightarrow$ Powered via LiPo battery (XT60/XT30).
-
----
-
----
-
-## 10. Resolving MAVProxy Python Dependencies
-
-When launching MAVProxy in a virtual environment on Python 3.12 or newer, you may encounter a dependency crash:
-`ModuleNotFoundError: No module named 'future'`
-
-This occurs because MAVProxy relies on legacy Python compatibility modules that are no longer pre-packaged.
-
-### 10.1 Install Missing Modules
-
-Ensure your virtual environment is active, then install the missing packages:
-
-```bash
-pip install future
-
-```
-
-If the bridge continues to fail with module errors, install the core serial and MAVLink libraries:
-
-```bash
-pip install pyserial pymavlink
-
-```
-
----
-
-## 11. Unlocking Hardware UART on Ubuntu (`/dev/serial0` Error)
-
-If you launch MAVProxy and receive the following error:
-`[Errno 2] could not open port /dev/serial0: [Errno 2] No such file or directory: '/dev/serial0'`
-
-This means the physical RX/TX pins on the Raspberry Pi are disabled at the BIOS level, or the operating system is reserving them for a serial login console. On Ubuntu distributions, the standard `raspi-config` tool is unavailable, requiring manual configuration of the boot files.
-
-### 11.1 Enable the UART Pins
-
-You must edit the hardware configuration file to activate the pins and disable Bluetooth (which frees up the high-speed UART required for a 921600 baud rate).
-
-1. Open the configuration file (do not leave the virtual environment; `sudo` will bypass it):
-```bash
-sudo nano /boot/firmware/config.txt
-
-```
-
-
-*(If this file is empty, use `sudo nano /boot/config.txt` instead).*
-2. Scroll to the absolute bottom of the file and append these two lines:
-```plaintext
-enable_uart=1
-dtoverlay=disable-bt
-
-```
-
-
-3. Save (`Ctrl+O`, `Enter`) and Exit (`Ctrl+X`).
-
----
-
-### 11.2 Disable the Serial Login Console
-
-Linux attempts to send boot logs to the serial pins by default, which will corrupt the MAVLink data stream.
-
-1. Open the command line boot parameters:
-```bash
-sudo nano /boot/firmware/cmdline.txt
-
-```
-
-
-*(Or `/boot/cmdline.txt`).*
-2. This file contains exactly **one continuous line of text**. Do not add line breaks.
-3. Locate and delete **only** the following string:
-`console=serial0,115200` (or `console=ttyAMA0,115200`).
-4. **CRITICAL:** Do NOT delete `console=tty1`. Keep all remaining text on a single line.
-5. Save and Exit.
-
-### 11.3 Remove ModemManager
-
-The `modemmanager` service actively scans open serial ports looking for 4G modems. If it scans the port connected to your SpeedyBee, it will interrupt the connection and cause a crash.
-Remove it permanently:
-
-```bash
-sudo apt-get remove modemmanager -y
-
-```
-
-### 11.4 Reboot and Verify
-
-Hardware configuration changes require a full system reboot.
-
-```bash
-sudo reboot
-
-```
-
-Wait 60 seconds, reconnect via SSH, and verify the port is now active:
-
-```bash
-ls -l /dev/serial0
-
-```
-
-*Expected Output:* A symlink pointing to `ttyAMA0` or `ttyS0`. If this appears, the hardware is unlocked and ready for the MAVProxy bridge.
-
----
-
-# Documentation: Resolving Power Loops & Serial Heartbeat Failures
-
-## [CRITICAL UPDATE TO PREVIOUS DOCUMENTATION]
-
-**Changes applied to Section 10 (Power Sequencing)**
-The previous "Double Power" rule is dangerously flawed if your Electronic Speed Controller (ESC) or UBEC is already hardwired to the Raspberry Pi's 5V rail.
-
-* **Updated Power Protocol (The "Single Power" Rule):** You must never supply 5V to the Raspberry Pi via USB-C if it is also receiving 5V from the LiPo battery via a UBEC. This creates a voltage conflict and a ground loop, triggering the SpeedyBee's Overcurrent Protection (the board shutting down after 3 seconds).
-* **Action Required:** Disconnect the USB-C cable entirely. Plug in the LiPo battery. The battery will power the ESC, which powers the UBEC, which powers the Pi. The battery also powers the SpeedyBee. Use the Wi-Fi network configured in Section 7 to SSH into the Pi.
-
----
-
----
-
-## 12. Resolving Overcurrent Protection (3-Second Shutdown)
-
-If the SpeedyBee lights up and shuts down after 2-3 seconds, the Power Management IC (PMIC) is detecting a short circuit or massive voltage conflict.
-
-### 12.1 Isolate the Conflict
-
-1. **Unplug all power immediately.** Do not repeatedly plug the battery in to test it, or you will destroy the voltage regulators.
-2. **Inspect Solder Joints:** Zoom in on the `T6`, `R6`, `5V`, and `GND` pads. Ensure no microscopic solder balls or stray wire strands are bridging adjacent pads.
-3. **Enforce Single Power:** Ensure the Raspberry Pi is only receiving power from ONE source (either isolated USB-C with no 5V wire connected to the FC, OR the drone's UBEC with USB-C disconnected).
-
----
-
-## 13. Bypassing `/dev/serial0` (Direct Hardware UART)
-
-If editing the boot configuration files (as detailed in Section 11) fails to generate the `/dev/serial0` symlink, or if you refuse to reboot the system, you must point MAVProxy directly to the hardware UART alias.
-
-### 13.1 Identify the Hardware Port
-
-List all active serial devices:
-
-```bash
-ls /dev/ttyA* /dev/ttyS*
-
-```
-
-If `/dev/ttyAMA0` is present, the hardware gates are open. This is the primary high-speed UART on the Raspberry Pi.
-
-### 13.2 Launch MAVProxy via Direct Alias
-
-Modify the launch command to target `ttyAMA0` instead of `serial0`.
+### Step 9.1 — Start the Bridge on the Raspberry Pi
 
 ```bash
 source ~/drone_link/venv/bin/activate
 mavproxy.py --master=/dev/ttyAMA0 --baudrate 921600 --out=udp:10.119.242.128:14550
+```
 
+Replace the IP address with your laptop's current IP if it has changed since initial setup. Check for the `Heartbeat` message in the MAVProxy terminal — this confirms the SpeedyBee is transmitting MAVLink data.
+
+---
+
+### Step 9.2 — Connect QGroundControl
+
+Open QGC on the laptop. Go to **Application Settings → Comm Links** and activate the UDP link on Port `14550` created in Section 5.6.
+
+---
+
+### Step 9.3 — Perform Wireless Accelerometer Calibration
+
+With the drone untethered from USB, you can freely rotate it for calibration.
+
+1. In QGC, go to **Vehicle Setup (gear icon) → Sensors → Accelerometer**.
+2. Click **Calibrate**.
+3. Follow the on-screen prompts — place the drone in each of 6 positions and hold still when indicated:
+   - Level (top facing up, nose facing forward)
+   - Left Side (rotate 90° so left side faces down)
+   - Right Side (rotate 90° so right side faces down)
+   - Nose Down (pitch forward 90° so nose faces down)
+   - Nose Up (pitch backward 90° so nose faces up)
+   - Upside Down (flip 180° so bottom faces up)
+4. QGC will confirm each position with a green checkmark before prompting for the next.
+
+If a compass is attached, repeat the process under the **Compass** tab, rotating the drone smoothly through all axes until the progress bar completes (see Section 25 for detailed compass calibration).
+
+---
+
+<a name="section-10"></a>
+## Section 10 — Resolving MAVProxy Python Dependencies
+
+When launching MAVProxy inside a virtual environment on Python 3.12 or newer, you may encounter dependency crashes immediately on startup.
+
+### Common Error Messages
+
+```
+ModuleNotFoundError: No module named 'future'
+ModuleNotFoundError: No module named 'serial'
+ModuleNotFoundError: No module named 'pymavlink'
+```
+
+### Fix — Install All Required Modules Together
+
+Ensure the virtual environment is active, then install:
+
+```bash
+source ~/drone_link/venv/bin/activate
+pip install mavproxy future pyserial pymavlink
+```
+
+Installing all four in a single command ensures pip resolves version compatibility between them simultaneously. Installing them one at a time can result in version conflicts.
+
+---
+
+<a name="section-11"></a>
+## Section 11 — Unlocking Hardware UART (`/dev/serial0` Error)
+
+### Error Message
+
+```
+[Errno 2] could not open port /dev/serial0: [Errno 2] No such file or directory: '/dev/serial0'
+```
+
+### What This Means
+
+The physical RX/TX GPIO pins (Pins 8 and 10) on the Raspberry Pi are either:
+1. Disabled at the hardware/boot level, or
+2. Reserved by the OS for a serial login console (so you can plug in a terminal to the GPIO pins to log in).
+
+On standard Raspberry Pi OS, `raspi-config` handles this setup. On Ubuntu distributions, you must manually edit the boot configuration files.
+
+### The Two UARTs on Raspberry Pi — Important Background
+
+The Raspberry Pi has two UART hardware interfaces:
+- **Mini-UART (ttyS0):** A simpler, lower-quality UART whose baud rate is tied to the CPU clock frequency. It **cannot reliably sustain 921600 baud** — data corruption is common.
+- **PL011 UART (ttyAMA0):** The full-featured, hardware-clocked UART capable of stable high-speed communication. This is what MAVProxy needs.
+
+By default, the Pi assigns the PL011 UART to the Bluetooth chip, and the Mini-UART to the GPIO pins. You must swap this assignment by disabling Bluetooth.
+
+---
+
+### Step 11.1 — Enable UART and Disable Bluetooth (`config.txt`)
+
+```bash
+sudo nano /boot/firmware/config.txt
+# If that file is empty or doesn't exist, try:
+# sudo nano /boot/config.txt
+```
+
+Scroll to the **absolute bottom** of the file. Append these lines exactly to the `[all]` section:
+
+```
+[all]
+enable_uart=1
+dtoverlay=disable-bt
+```
+
+> **⚠ Critical typo warning:** The overlay name must be `disable-bt` — not `disable-b`, not `disable_bt`, not `disablebt`. Any deviation will silently fail, leaving Bluetooth assigned to the PL011 UART and your GPIO pins still running the slower Mini-UART.
+
+`enable_uart=1` explicitly activates the GPIO UART pins. `dtoverlay=disable-bt` loads a device tree overlay that disconnects the Bluetooth chip from the PL011 UART and reassigns PL011 to the GPIO pins.
+
+---
+
+### Step 11.2 — Strip the Serial Console (`cmdline.txt`)
+
+```bash
+sudo nano /boot/firmware/cmdline.txt
+# Or: sudo nano /boot/cmdline.txt
+```
+
+> **Critical:** This file contains exactly **one continuous line of text**. Do not add any line breaks. Adding a newline will prevent the Pi from booting.
+
+Locate and delete **only** the following string (one of these forms):
+- `console=serial0,115200`
+- `console=ttyAMA0,115200`
+- `console=ttyS0,115200`
+
+**Do NOT delete `console=tty1`** — this is the HDMI/monitor console and must remain.
+
+A valid, clean `cmdline.txt` looks like:
+```
+multipath=off dwc_otg.lpm_enable=0 console=tty1 root=LABEL=writable rootfstype=ext4 rootwait fixrtc cfg80211.ieee80211_regdom=IN
+```
+
+Save with `Ctrl+O`, `Enter`. Exit with `Ctrl+X`.
+
+---
+
+### Step 11.3 — Remove and Mask Squatter Services
+
+Two types of background services will steal serial port access from MAVProxy:
+
+**ModemManager** scans open serial ports looking for 4G/LTE modems. When it scans the port connected to your SpeedyBee, it sends modem probe commands that corrupt the MAVLink data stream and cause a crash. Remove it completely:
+
+```bash
+sudo apt-get remove modemmanager -y
+```
+
+**Serial Getty services** provide login terminals on serial ports — exactly what we removed from `cmdline.txt`. The OS may still attempt to respawn them via systemd unless explicitly masked:
+
+```bash
+sudo systemctl mask serial-getty@ttyAMA0.service
+sudo systemctl mask serial-getty@ttyS0.service
+sudo systemctl stop serial-getty@ttyAMA0.service
+sudo systemctl stop serial-getty@ttyS0.service
+```
+
+`mask` is stronger than `disable` — it creates a symlink to `/dev/null` that prevents the service from ever starting, even if another service tries to start it.
+
+---
+
+### Step 11.4 — Reboot and Verify
+
+```bash
+sudo reboot
+```
+
+Wait 60 seconds, reconnect via SSH, then verify:
+
+```bash
+ls -l /dev/serial0
+```
+
+**Expected output:** A symlink pointing to `ttyAMA0`:
+```
+lrwxrwxrwx 1 root root 7 Jan  1 00:00 /dev/serial0 -> ttyAMA0
+```
+
+Also confirm available serial devices:
+```bash
+ls /dev/ttyA* /dev/ttyS*
 ```
 
 ---
 
-## 14. Troubleshooting "Waiting for Heartbeat" (Link 1 Down)
+<a name="section-12"></a>
+## Section 12 — Overcurrent Protection (3-Second Shutdown)
 
-If MAVProxy successfully opens the port but reports `Waiting for heartbeat` and `link 1 down`, the Raspberry Pi is listening, but the SpeedyBee is not transmitting valid data.
+### Symptom
 
-### 14.1 The Wiring Cross-Check
+The SpeedyBee powers on (LEDs illuminate), then shuts down completely after 2–3 seconds.
 
-Serial communication strictly requires Transmit (TX) to connect to Receive (RX).
+### Cause
 
-1. Verify Pi Pin 8 (TX) connects to SpeedyBee `R6`.
-2. Verify Pi Pin 10 (RX) connects to SpeedyBee `T6`.
-3. **The Swap Test:** If wired correctly but failing, physically swap the wires at the SpeedyBee. Board labeling is frequently inverted by manufacturers.
+The Power Management IC (PMIC) on the SpeedyBee detects either a short circuit or a voltage conflict and triggers its protection circuit. This is a hardware safety feature that cuts power to prevent component damage.
+
+### Action Steps
+
+1. **Unplug all power immediately.** Do not repeatedly test by plugging the battery back in — each overcurrent event stresses the voltage regulators. Repeated testing destroys them.
+
+2. **Inspect solder joints** on the `T6`, `R6`, `5V`, and `GND` pads under magnification (phone camera zoom works). Look for:
+   - Microscopic solder balls bridging adjacent pads
+   - Stray wire strands shorting across pads
+   - Solder bridges between any two adjacent pads
+
+3. **Enforce the Single Power Rule** (Section 3):
+   - Raspberry Pi must receive 5V from exactly one source.
+   - If the Pi is connected to the drone's UBEC via the 5V pad, the USB-C cable must be physically disconnected.
+   - If the Pi is powered by USB-C, the 5V wire to the UBEC must be disconnected.
 
 ---
 
-### 14.2 Terminate Squatter Services
+<a name="section-13"></a>
+## Section 13 — Bypassing `/dev/serial0` (Direct UART Alias)
 
-Background Linux services will steal the serial data before MAVProxy can read it. Execute these commands to permanently kill them:
+If the `serial0` symlink still doesn't exist after rebooting with the boot file edits applied, point MAVProxy directly to the hardware device instead:
+
+### Step 13.1 — Confirm the Hardware Port Exists
+
+```bash
+ls /dev/ttyA* /dev/ttyS*
+```
+
+If `/dev/ttyAMA0` is listed, the PL011 UART hardware is present and accessible.
+
+### Step 13.2 — Launch MAVProxy Using Direct Alias
+
+```bash
+source ~/drone_link/venv/bin/activate
+mavproxy.py --master=/dev/ttyAMA0 --baudrate 921600 --out=udp:10.119.242.128:14550
+```
+
+Using `ttyAMA0` directly bypasses the symlink and communicates directly with the PL011 UART hardware.
+
+---
+
+<a name="section-14"></a>
+## Section 14 — Troubleshooting "Waiting for Heartbeat" (Link 1 Down)
+
+### What This Means
+
+MAVProxy successfully opened the serial port — the software path is working. However, the SpeedyBee is not transmitting any MAVLink data. The Pi is listening but the flight controller is silent.
+
+Work through these steps in order:
+
+---
+
+### Step 14.1 — Wiring Cross-Check
+
+Serial communication requires TX → RX crossing. Verify:
+- Pi **Pin 8 (TX / GPIO 14)** → SpeedyBee **R6**
+- Pi **Pin 10 (RX / GPIO 15)** → SpeedyBee **T6**
+
+**The Mandatory Swap Test:** If wired exactly as above but still failing, physically swap the two data wires at the SpeedyBee pads (connect what was on R6 to T6, and vice versa). Board pad labeling is **frequently inverted by manufacturers** — what the board labels "T6" may actually be functioning as the receive pin internally. This swap fixes the issue in a significant percentage of cases.
+
+---
+
+### Step 14.2 — Kill Squatter Services
+
+If services were not masked in Section 11.3, do it now:
 
 ```bash
 sudo systemctl stop serial-getty@ttyAMA0.service
 sudo systemctl disable serial-getty@ttyAMA0.service
 sudo systemctl mask serial-getty@ttyAMA0.service
 sudo apt-get remove modemmanager -y
-
 ```
 
-### 14.3 Verify ArduPilot Parameters
+---
 
-The flight controller will remain silent if the software is not configured to broadcast MAVLink on UART6.
+### Step 14.3 — Verify ArduPilot Parameters
 
-1. Connect via USB to QGroundControl.
-2. Ensure `SERIAL6_PROTOCOL` = `2` (MAVLink 2).
-3. Ensure `SERIAL6_BAUD` = `921` (921600).
-4. Ensure `BRD_SER6_RTSCTS` = `0` (Disabled).
-5. Write parameters and reboot the flight controller.
+Connect the SpeedyBee to QGC via USB and confirm these parameters are set correctly:
 
-### 14.4 The Raw Python Diagnostic Test
+| Parameter | Required Value | Notes |
+|-----------|---------------|-------|
+| `SERIAL6_PROTOCOL` | `2` | MAVLink 2 protocol |
+| `SERIAL6_BAUD` | `921` | 921600 baud |
+| `BRD_SER6_RTSCTS` | `0` | Disables hardware flow control (RTS/CTS). Enabling this when no RTS/CTS wires are connected causes the FC to wait forever for a clear-to-send signal. |
 
-To isolate whether the issue is MAVProxy configuration or a dead physical link, use a raw Python script to read the pins directly.
+Write parameters and reboot the flight controller after any changes.
+
+---
+
+### Step 14.4 — The Raw Python Diagnostic Test
+
+This test bypasses MAVProxy entirely to isolate whether the problem is in the software layer or the physical hardware:
 
 ```bash
 python3 -c "import serial; s=serial.Serial('/dev/ttyAMA0', 921600, timeout=1); print(s.read(100))"
-
 ```
 
-* **If it prints gibberish (e.g., `b'\xfe\x01\x05...'`):** The hardware link is perfect. The SpeedyBee is transmitting. The issue lies within MAVProxy's configuration.
-* **If it prints empty (`b''`):** The hardware link is dead. The SpeedyBee is silent. Check your wiring, ArduPilot parameters, or ensure the SpeedyBee is powered by the LiPo battery.
+**Interpreting the output:**
+
+| Output | Meaning | Next Step |
+|--------|---------|-----------|
+| Hex/binary data (e.g., `b'\xfe\x01\x05...'`) | Hardware link is perfect. SpeedyBee is transmitting. | Problem is in MAVProxy config — recheck parameters and port settings. |
+| Empty string `b''` | Hardware link is dead. SpeedyBee is not transmitting. | Check physical wiring, ArduPilot parameters, and LiPo power. |
+| `Permission denied` | User lacks serial port access | Run `sudo usermod -a -G dialout $USER` and reboot |
+| `[Errno 2] No such file...` | Port doesn't exist | Return to Section 11 |
+| `Input/output error` | OS has locked the port | Go to Section 15 |
 
 ---
 
-# Documentation: Serial Port I/O Errors and Hardware Silence
+<a name="section-15"></a>
+## Section 15 — Resolving Persistent `Input/Output Error` (ttyS0)
 
-## [CRITICAL UPDATE TO PREVIOUS DOCUMENTATION]
+### Error Message
 
-**Changes applied to Section 11 (Unlocking Hardware UART)**
-The initial `cmdline.txt` edits and service terminations in Section 11 may not be sufficient on Ubuntu. If the operating system aggressively respawns the serial login console, it causes a hard `Input/output error` (Error 5) on the `/dev/ttyS0` port. The commands to stop the `serial-getty` service must be upgraded to a full system `mask`.
+```
+[Errno 5] Input/output error
+```
 
----
+### Cause
 
-## 15. Resolving Input/Output Errors (`ttyS0`)
+The Linux kernel has monopolized the serial hardware for a login console. When MAVProxy or a Python script attempts to open the port, the OS denies access — it treats the serial port as a system resource, not a user-accessible device. Stopping `serial-getty` via `systemctl stop` alone is insufficient on some Ubuntu builds because the kernel boot configuration actively re-engages it.
 
-If running a raw Python serial test on `/dev/ttyS0` yields an `Input/output error`, the Linux kernel is actively using the port for a Serial Login Console, creating a lock that prevents MAVProxy from accessing the pins.
+### Fix
 
-### 15.1 Mask the Squatter Services
-
-You must forcefully prevent the OS from ever starting the login services on these ports. Run these commands:
+You must both mask the systemd services **and** edit the boot file:
 
 ```bash
 sudo systemctl mask serial-getty@ttyS0.service
 sudo systemctl mask serial-getty@ttyAMA0.service
 sudo systemctl stop serial-getty@ttyS0.service
 sudo systemctl stop serial-getty@ttyAMA0.service
-
 ```
 
-### 15.2 Clean the Boot Command Line
-
-Ensure the boot configuration is entirely clear of serial console assignments.
-
-1. Open the file:
-```bash
-sudo nano /boot/firmware/cmdline.txt
-
-```
-
-
-2. Delete `console=serial0,115200` or `console=ttyS0,115200` if they exist.
-3. The remaining text **must** be on a single line. Example of a clean configuration:
-`multipath=off dwc_otg.lpm_enable=0 console=tty1 root=LABEL=writable rootfstype=ext4 rootwait fixrtc cfg80211.ieee80211_regdom=IN`
-4. Save (`Ctrl+O`, `Enter`) and Exit (`Ctrl+X`).
-5. **Reboot the Raspberry Pi** (`sudo reboot`) for the kernel to release the lock.
+Then edit `cmdline.txt` to ensure the serial console assignment is completely removed (see Section 11.2 for exact instructions). After editing, reboot the Pi — the kernel must release the hardware lock during boot.
 
 ---
 
-## 16. Resolving Hardware Silence (`b''` Output)
+<a name="section-16"></a>
+## Section 16 — Resolving Hardware Silence (`b''` Output)
 
-If the port opens successfully but the raw Python test returns `b''` (an empty byte string), the software is working perfectly but the physical hardware link is dead. The SpeedyBee is not transmitting data to the Pi.
+When the serial port opens without error but the Python test returns `b''` (empty), the software is working correctly — the problem is entirely physical.
 
-### 16.1 The Mandatory Wire Swap
+### Step 16.1 — The Mandatory Wire Swap
 
-If the port is silent, the Transmit (TX) and Receive (RX) wires are almost certainly backwards. Manufacturer pad labeling is frequently inconsistent.
+Disconnect the data wires from the SpeedyBee pads and reconnect them in reverse:
+- Wire that was on `R6` → move to `T6`
+- Wire that was on `T6` → move to `R6`
 
-1. Disconnect the data wires from the SpeedyBee.
-2. **Reverse them:** Connect the Pi's TX pin to the pad you were previously using for RX. Connect the Pi's RX pin to the pad you were previously using for TX.
+Manufacturer pad labeling inconsistency is the single most common cause of `b''` output.
 
-### 16.2 Verify Common Ground
+---
 
-Serial communication relies on voltage differentials. Without a shared ground reference, the data stream becomes unreadable noise or silence.
+### Step 16.2 — Verify Common Ground
 
-* Ensure a dedicated wire connects a **GND** pin on the Raspberry Pi directly to a **GND** pad on the SpeedyBee. Do not rely solely on the battery ground path.
+Serial communication measures voltage differentials between data lines and ground. If the Pi and SpeedyBee do not share a ground reference, the data signal appears as noise or nothing.
 
-### 16.3 Verify Advanced ArduPilot Parameters
+Ensure a dedicated wire connects a **GND pin on the Raspberry Pi** directly to a **GND pad on the SpeedyBee**. Do not rely on the battery negative terminal as an indirect ground path — resistance and inductance in power cables at high baud rates degrades signal integrity.
 
-If the wiring is physically correct but the port remains silent, ArduPilot may have hidden options enabled that corrupt the signal.
+---
 
-1. Connect the SpeedyBee via USB to QGroundControl.
-2. Go to Parameters and verify:
-* `SERIAL6_PROTOCOL` = `2` (MAVLink 2)
-* `SERIAL6_BAUD` = `921` (921600)
-* **`SERIAL6_OPTIONS` = `0**` (Ensures signal inversion and half-duplex modes are completely disabled).
+### Step 16.3 — Check Hidden ArduPilot Signal Options
 
+ArduPilot has a parameter that enables signal inversion and half-duplex modes. If these were accidentally enabled (they affect signal polarity), the data appears as inverted noise:
 
-3. Write parameters, safely disconnect, and power cycle the flight controller with the LiPo battery.
+Connect the SpeedyBee via USB to QGC and verify:
 
-### 16.4 Test Alternate UART Aliases
+```
+SERIAL6_OPTIONS = 0   (All options disabled — no inversion, no half-duplex)
+```
 
-On specific Ubuntu builds, the high-speed UART is assigned a non-standard alias. If `ttyAMA0` and `ttyS0` fail, test the following:
+Write parameters and power cycle the flight controller using the LiPo battery (not just a software reboot).
+
+---
+
+### Step 16.4 — Test Alternate UART Aliases
+
+On specific Ubuntu builds, the high-speed UART may be assigned a non-standard device node. If `ttyAMA0` and `ttyS0` both fail, test:
 
 ```bash
 python3 -c "import serial; s=serial.Serial('/dev/ttyAMA1', 921600, timeout=1); print(s.read(100))"
-
 ```
----
-
-# Documentation: Resolving Kernel Locks and Finalizing UART Configuration
-
-## [CRITICAL UPDATE TO PREVIOUS DOCUMENTATION]
-
-**Changes applied to Section 11 & Section 15 (Hardware Configuration)**
-Stopping background services via `systemctl` is insufficient on certain Ubuntu distributions. If the Linux kernel is explicitly instructed via boot files to use the serial port for a login console, it creates a hard hardware lock, resulting in an `Input/output error` (Error 5). You cannot bypass this with commands; you must edit the boot files and perform a hard reboot.
-
-Additionally, a critical typo was identified in the `config.txt` file instructions. `disable-b` is invalid. It must be exactly `disable-bt`.
 
 ---
 
----
+<a name="section-17"></a>
+## Section 17 — Understanding Persistent Input/Output Error (Error 5)
 
-## 17. Understanding Persistent `Input/output error` (Error 5)
+### Two Distinct Failure Modes
 
-If running the Python serial test on `/dev/ttyS0` continually results in an `Input/output error`, the Linux kernel has monopolized the hardware.
+**Error 5 on `/dev/ttyS0` (Input/Output Error):**
+The OS is actively listening for a user to log in via the TX/RX GPIO pins. When MAVProxy or Python attempts to open the port, the kernel denies access. Fix: Edit `cmdline.txt` and mask the serial-getty services, then reboot.
 
-* **The Cause:** The OS is actively listening for a user to log in via the TX/RX pins. When MAVProxy or Python attempts to open the port, the OS denies access to prevent system instability.
-* **The Symptom (`b''` output):** Conversely, if `/dev/ttyAMA0` returns an empty string (`b''`), it means the high-speed hardware UART is currently assigned to the onboard Bluetooth chip, not your physical GPIO pins.
+**`b''` (empty output) on `/dev/ttyAMA0`:**
+The high-speed PL011 UART is currently assigned to the onboard Bluetooth chip rather than the GPIO pins. The port opens (no error) but the Bluetooth chip's data is not what you want. Fix: Apply the `config.txt` changes in Section 11.1 (`disable-bt` overlay) and reboot.
 
-To resolve both issues simultaneously, the boot configurations must be surgically modified to strip the OS of its control over the serial pins and re-route the high-speed UART to them.
-
----
-
-## 18. Finalizing Boot Configuration Files
-
-These two files dictate how the Raspberry Pi allocates its hardware the millisecond it receives power.
+Both issues must be resolved simultaneously via the boot configuration changes in Section 18.
 
 ---
 
-### 18.1 Strip the Serial Console (`cmdline.txt`)
+<a name="section-18"></a>
+## Section 18 — Finalizing Boot Configuration Files
 
-You must ensure the OS does not boot a login console on the serial pins.
+These two files are the definitive hardware allocation instructions that the Pi processes the instant it receives power:
 
-1. Open the file:
+### Step 18.1 — Strip the Serial Console (`cmdline.txt`)
+
 ```bash
 sudo nano /boot/firmware/cmdline.txt
-
 ```
 
+Verify the entire file is **one single continuous line** with no line breaks. Delete any instance of:
+- `console=serial0,115200`
+- `console=ttyAMA0,115200`
+- `console=ttyS0,115200`
 
-2. Verify the text is exactly on **one single line**.
-3. Ensure the strings `console=serial0,115200` or `console=ttyS0,115200` are completely deleted.
-4. *Valid Example Configuration:*
-```plaintext
+Keep `console=tty1` intact. A valid configuration:
+
+```
 multipath=off dwc_otg.lpm_enable=0 console=tty1 root=LABEL=writable rootfstype=ext4 rootwait fixrtc cfg80211.ieee80211_regdom=IN
-
 ```
 
+---
 
-5. Save and Exit.
+### Step 18.2 — Re-route the High-Speed UART (`config.txt`)
 
-### 18.2 Re-route the High-Speed UART (`config.txt`)
-
-The Raspberry Pi has two UARTs. The default "mini-UART" cannot handle the 921600 baud rate required by the SpeedyBee. You must disable Bluetooth to free up the primary "PL011" UART and route it to your pins.
-
-1. Open the file:
 ```bash
 sudo nano /boot/firmware/config.txt
-
 ```
 
+Scroll to the `[all]` section at the very bottom. Add:
 
-2. Scroll to the `[all]` section at the very bottom.
-3. Add the following exact commands (ensure there are no typos, such as omitting the 't' in 'bt'):
-```plaintext
+```
 [all]
 enable_uart=1
 dtoverlay=disable-bt
-
 ```
 
-
-4. Save and Exit.
+> **Mandatory typo check:** It must be `disable-bt` with a hyphen before `bt`. Any other spelling fails silently. The `t` in `bt` stands for "Bluetooth" and must be present.
 
 ---
 
-## 19. The Mandatory Power Reset & Verification
+<a name="section-19"></a>
+## Section 19 — Mandatory Power Reset & Final Verification
 
-Because the hardware allocation is defined at the BIOS level, a live system cannot apply these changes. A full reboot is mandatory. Furthermore, the SpeedyBee flight controller must be power-cycled to clear its crashed I2C bus (which causes the `Baro` error).
+Boot file changes are processed at the BIOS/hardware-init level and **cannot** be applied to a live running system. A full reboot is mandatory.
 
-### 19.1 Execution Sequence
+Additionally, the SpeedyBee must be power-cycled to clear any crashed I2C bus state that may have built up from previous failed boots.
 
-1. **Unplug the LiPo battery** from the drone (SpeedyBee powers down).
-2. **Reboot the Raspberry Pi:**
-```bash
-sudo reboot
+### Step 19.1 — Execution Sequence
 
-```
+1. **Unplug the LiPo battery** from the drone (SpeedyBee powers down completely).
+2. On the Raspberry Pi, issue a clean reboot:
+   ```bash
+   sudo reboot
+   ```
+3. Wait **60 seconds** for the Pi to fully boot and reconnect to Wi-Fi.
+4. Re-establish SSH connection:
+   ```bash
+   ssh drone2@drone2.local
+   ```
+5. **Plug the LiPo battery back in.** The SpeedyBee will boot cleanly without interference from the Pi's initialization traffic.
 
+### Step 19.2 — Final Data Verification
 
-3. Wait 60 seconds for the Pi to reconnect to the network.
-4. Re-establish your SSH connection.
-5. **Plug the LiPo battery back in.** (The SpeedyBee boots cleanly, with no garbage data coming from the Pi).
-
-### 19.2 The Final Data Test
-
-Verify the connection using the newly assigned high-speed UART (`ttyAMA0`).
-
-1. Activate the virtual environment:
 ```bash
 source ~/drone_link/venv/bin/activate
-
-```
-
-
-2. Run the diagnostic test:
-```bash
 python3 -c "import serial; s=serial.Serial('/dev/ttyAMA0', 921600, timeout=1); print(s.read(100))"
-
 ```
 
-
-
-* **Success:** If the output is a string of hexadecimal characters (e.g., `b'\xfd\x01\x05...'`), the hardware link is verified.
-* **Failure (`b''`):** If the output is empty, the software is fully unlocked, meaning the failure is strictly physical. Swap the TX and RX wires on the SpeedyBee pads immediately.
-
-
----
-
-# Documentation: I2C Bus Conflicts and Compass Integration
-
-## [CRITICAL UPDATE TO PREVIOUS DOCUMENTATION]
-
-**Changes applied to Section 1 (Overview) & Section 12 (Resolving Overcurrent/Sensor Failures)**
-Previously, the `Baro` error was primarily attributed to SD Card formatting, low voltage, or uncalibrated accelerometers. While those remain valid failure points, a **critical new root cause** has been identified: **I2C Bus Jamming**.
-
-If removing the GPS module instantly cures the `Baro` error (but replaces it with a `Compass not healthy` error), the SD card and software configuration are perfectly fine. The external compass and the internal barometer share the same physical data highway (the I2C bus). If the GPS/Compass is miswired, underpowered, or shorting, it crashes the entire I2C bus, taking the internal Barometer offline with it.
+| Result | Interpretation | Action |
+|--------|---------------|--------|
+| `b'\xfd\x01\x05...'` (hex bytes) | ✅ Hardware link fully verified | Proceed to MAVProxy bridge |
+| `b''` (empty) | ❌ Physical hardware link dead | Swap TX and RX wires on SpeedyBee pads immediately |
 
 ---
 
-## 20. Diagnosing the I2C Bus Conflict
+<a name="section-20"></a>
+## Section 20 — Diagnosing the I2C Bus Conflict
 
-The onboard barometer (SPL06 or DPS310) and the external compass (inside the GPS puck) both communicate with the SpeedyBee's CPU using the `SDA` (Data) and `SCL` (Clock) pads.
+### New Root Cause: I2C Bus Jamming
 
-**The Diagnostic Test:**
+Even with a perfect SD card and correct power, the `Baro: unable to initialise driver` error can persist if the external GPS/Compass is miswired. This is because the onboard barometer (DPS310 or SPL06) and the external compass inside the GPS puck both communicate over the same physical data lines — the I2C bus (SDA and SCL pads).
 
-1. Unplug the GPS/Compass module completely from the SpeedyBee.
+When a miswired or shorted GPS is connected, it can pull the I2C bus to ground, crashing it entirely. The barometer cannot respond, ArduPilot times out, and the `Config Error` loop restarts.
+
+### The Definitive Diagnostic Test
+
+1. **Unplug the GPS/Compass module completely** from the SpeedyBee.
 2. Boot the flight controller.
-3. If the `Baro` error disappears and is replaced by `Compass not healthy`, you have an absolute confirmation of an I2C hardware conflict.
+3. **Interpret the result:**
+   - **`Config Error` disappears entirely** → The GPS was the only problem. The SD card and parameters are fine.
+   - **`Config Error` disappears but `Compass not healthy` appears** → Absolute confirmation of an I2C hardware conflict caused by the GPS connection.
+   - **`Config Error` persists with GPS unplugged** → The GPS was not the cause. Return to Sections 2–4.
 
 ---
 
-## 21. Resolving I2C Hardware & Wiring Failures
+<a name="section-21"></a>
+## Section 21 — Resolving I2C Hardware & Wiring Failures
 
-Unlike the UART TX/RX lines used for the MAVProxy bridge, I2C wiring has strict, non-crossing rules and specific power requirements.
+### Step 21.1 — The Non-Crossing Rule for I2C
 
-### 21.1 The Non-Crossing Rule
+I2C wiring is fundamentally different from UART wiring:
 
-Serial (UART) wires must cross (`TX` to `RX`). **I2C wires do NOT cross.**
+| Protocol | Wiring Rule |
+|----------|------------|
+| UART (Serial) | **Crosses:** TX connects to RX on the other device |
+| I2C | **Does NOT cross:** SDA connects to SDA; SCL connects to SCL |
 
-* Verify GPS `SDA` is wired exactly to SpeedyBee `SDA`.
-* Verify GPS `SCL` is wired exactly to SpeedyBee `SCL`.
-
-### 21.2 Inspect for Micro-Shorts
-
-The `SDA` and `SCL` pads on SpeedyBee flight controllers are typically located extremely close together. Use a magnifying glass to inspect the solder joints. A single, microscopic strand of wire bridging `SDA` and `SCL` will instantly crash the entire I2C bus, killing both the compass and the barometer.
-
-### 21.3 Voltage Verification
-
-Compasses require stable power to communicate on the I2C bus. If the compass attempts to draw power and fails, it pulls the data lines to ground (crashing the bus).
-
-* Ensure the GPS/Compass is soldered to a **5V pad**, not a `3.3V` pad (unless explicitly required by your specific GPS module's manual).
-* **Power Note:** On many F405 boards, `4V5` pads receive power via USB, but standard `5V` pads *only* receive power when the LiPo battery is connected. If your GPS is on a standard `5V` pad, the compass (and therefore the Baro) will fail if you only power the board via USB.
+Wiring the GPS SDA to SpeedyBee SCL (or vice versa) will crash the I2C bus immediately.
 
 ---
 
-## 22. Firmware and Environmental Baro Fixes
+### Step 21.2 — BZGNSS BZ-251 Ribbon Cable Pinout
 
-If the wiring is flawless and powered by a LiPo battery, but the conflict persists, the issue lies in the ArduPilot parameters or environmental interference.
+The BZ-251 GPS module uses a ribbon (flat flex) cable. Pin 1 is typically marked with a small triangle or white stripe on the connector. Ribbon cables are highly susceptible to crossover errors if inserted backwards.
 
-### 22.1 Force the Chip ID (SpeedyBee F405 V4)
+| Pin | Signal | SpeedyBee F405 V4 Pad |
+|-----|--------|-----------------------|
+| 1 | TX (GPS transmit) | **R6** (UART6 RX — remember: TX crosses to RX) |
+| 2 | RX (GPS receive) | **T6** (UART6 TX — RX crosses to TX) |
+| 3 | GND | **G** (any ground pad) |
+| 4 | 5V / VCC | **4V5** or **5V** pad (see voltage note below) |
+| 5 | SCL | **SCL** |
+| 6 | SDA | **SDA** |
 
-Newer V4 boards utilize a DPS310 barometer. ArduPilot's auto-detect can occasionally fail to initialize this specific chip.
-
-1. Connect to QGroundControl.
-2. Navigate to **Vehicle Setup > Parameters**.
-3. Search for `BARO_PROBE_EXT`. Set it to `1` (or ensure the DPS310 bitmask is active).
-4. Search for `BARO_OPTIONS` and set to `1`.
-5. Reboot the flight controller.
-
-### 22.2 Masking Address Conflicts
-
-If utilizing an older GPS clone (e.g., HMC5883L), its hardcoded I2C address may identical to the onboard Barometer.
-
-1. Search for `COMPASS_TYPEMASK` in parameters.
-2. Disable legacy compass drivers one by one to determine if a specific driver is actively fighting the Baro for bus control.
-
-### 22.3 Environmental Light Shielding
-
-Barometers are highly sensitive to ultraviolet and infrared light. Calibrating under direct sunlight or intense bench lighting can cause the sensor to report erratic data, triggering an error lock.
-
-* **Fix:** Place a small piece of open-cell black foam directly over the Barometer chip (the silver rectangular component with a tiny hole). This must be done before flight to prevent wind-pressure anomalies anyway.
+> **Voltage Note — Critical:** On many F405 boards:
+> - `4V5` pads receive power via USB (active without LiPo).
+> - `5V` pads **only receive power when the LiPo battery is connected**.
+>
+> If your GPS is connected to a `5V` pad, the compass (and therefore the barometer via I2C bus contamination) will fail on USB-only power. If calibration works with LiPo but fails on USB, this is the reason.
 
 ---
 
-# Documentation: Resolving ArduPilot I2C Bus Hangs & Boot Loops
+### Step 21.3 — Inspect for Micro-Shorts
 
-## [CRITICAL UPDATE TO PREVIOUS DOCUMENTATION]
+The `SCL` and `SDA` pads on the SpeedyBee F405 V4 are **directly adjacent** to each other. Use a magnifying glass or phone camera at maximum zoom. Look for:
 
-**Changes applied to Section 21 (Resolving I2C Hardware & Wiring Failures)**
-The documentation now includes the specific pinout mapping for BZGNSS modules (e.g., BZ-251) utilizing ribbon cables. Ribbon cables are highly susceptible to crossover errors.
+- A single strand of wire from the ribbon cable that touches both pads
+- A solder bridge (a tiny dome of solder connecting both pads)
+- Flux residue that has become conductive
 
-* **Standard BZGNSS Pinout vs. SpeedyBee F405 V4:**
-* Pin 1 (TX) $\rightarrow$ SpeedyBee R6 (UART 6 RX)
-* Pin 2 (RX) $\rightarrow$ SpeedyBee T6 (UART 6 TX)
-* Pin 3 (GND) $\rightarrow$ SpeedyBee G (Ground)
-* Pin 4 (5V/VCC) $\rightarrow$ SpeedyBee 4V5 or 5V
-* Pin 5 (SCL) $\rightarrow$ SpeedyBee SCL
-* Pin 6 (SDA) $\rightarrow$ SpeedyBee SDA
-
-
-* **Micro-Short Warning:** The SCL and SDA pads on the SpeedyBee F405 V4 are directly adjacent. A single, microscopic strand of wire from the ribbon cable bridging these two pads will instantly crash the I2C bus.
+Even a high-resistance partial bridge can corrupt I2C communication without appearing as an obvious short.
 
 ---
 
+<a name="section-22"></a>
+## Section 22 — Firmware and Environmental Barometer Fixes
+
+### If Wiring Is Correct but Conflict Persists
+
+#### Step 22.1 — Force DPS310 Chip ID (SpeedyBee F405 V4)
+
+The F405 V4 uses a DPS310 barometer. ArduPilot's automatic detection can occasionally fail to initialize this specific chip variant.
+
+In QGC **Vehicle Setup → Parameters**:
+- Set `BARO_PROBE_EXT` = `1` (enables external barometer probing with DPS310 bitmask)
+- Set `BARO_OPTIONS` = `1`
+- Reboot the flight controller
+
+> **Note:** This differs from the standard fix (`BARO_PROBE_EXT = 0`). Only use these values if you have confirmed correct wiring and the barometer chip specifically fails to initialize.
+
 ---
 
-## 23. Diagnosing ArduPilot Boot-Loops (I2C Hangs)
+#### Step 22.2 — Legacy Compass Driver Address Conflicts
 
-When an I2C bus conflict occurs, ArduPilot will fail to initialize. This failure state is identifiable in the QGroundControl logs by a specific sequence of repeating critical errors.
+Older GPS modules using HMC5883L compass chips may have I2C addresses that conflict with the onboard barometer.
 
-### 23.1 Recognizing the Boot-Loop Signature
+In QGC Parameters, search for `COMPASS_TYPEMASK`. Disable legacy compass drivers one at a time to identify which driver is causing the bus conflict.
 
-If the QGC log displays the following pattern, the internal hardware bus has crashed:
+> **Version note:** `COMPASS_TYPEMASK` is deprecated in ArduPilot V4.5+. In V4.5 and newer, use individual `COMPASS_USE` parameters instead (see Section 27).
 
-```plaintext
-[Info] Initialising ArduPilot
+---
+
+#### Step 22.3 — Environmental Light Shielding
+
+Barometer sensors are sensitive to ultraviolet and infrared light. Calibrating or operating under direct sunlight, bright LED lighting, or near infrared sources causes the sensor to report erratic pressure readings, triggering an error lock.
+
+**Fix:** Before calibration and before any flight, place a small piece of **open-cell black foam** directly over the barometer chip (the silver rectangle with the tiny hole). Open-cell foam allows air pressure equalization (required for barometer function) while blocking light. Closed-cell foam seals the pressure inlet and will break barometer readings entirely.
+
+---
+
+<a name="section-23"></a>
+## Section 23 — Diagnosing ArduPilot Boot-Loops (I2C Hangs)
+
+### Recognizing the Boot-Loop Signature
+
+When an I2C bus conflict occurs, the QGC log displays this repeating critical error pattern:
+
+```
+[Info]     Initialising ArduPilot
 [Critical] Arm: Gyros not healthy
 [Critical] Arm: Baro: not healthy
 [Critical] Arm: AHRS: EKF3 not started
-
 ```
 
-* **Root Cause:** ArduPilot attempts to initialize. It pings the internal Inertial Measurement Unit (IMU/Gyros) and the Barometer. Because an external device (like a miswired GPS) has shorted the I2C/SPI bus, the internal sensors cannot reply. ArduPilot aborts the boot sequence and restarts, creating an infinite loop.
+This sequence then repeats indefinitely.
+
+### Why All Three Sensors Fail Together
+
+The IMU (Inertial Measurement Unit / Gyroscope), Barometer, and compass all communicate over the I2C or SPI bus. When an external device (like a miswired GPS) pulls one of the bus lines to ground or creates a voltage collision, the entire bus becomes unresponsive. ArduPilot queries the IMU and Barometer — neither replies — so it aborts the boot sequence and restarts, creating the infinite loop.
+
+The EKF3 (Extended Kalman Filter) cannot start because it requires sensor input from both the IMU and Barometer. Without EKF3, the aircraft cannot compute attitude or navigation, so arming is blocked.
 
 ---
 
-## 24. Resolving Duplicate I2C Address Clashes
+<a name="section-24"></a>
+## Section 24 — Resolving Duplicate I2C Address Clashes (DPS310 Conflict)
 
-If the wiring is perfectly mapped and free of shorts, but the boot-loop persists, the conflict is a hardware address clash. In the I2C protocol, every device must have a unique hexadecimal address.
+### The Problem
 
-### 24.1 The BZGNSS / SpeedyBee DPS310 Conflict
+Many GPS modules (including the BZGNSS BZ-251) contain an **internal DPS310 barometer**. The SpeedyBee F405 V4 also contains an **onboard DPS310 barometer**.
 
-Many GPS modules (like the BZ-251) contain an internal DPS310 barometer. The SpeedyBee F405 V4 also utilizes an onboard DPS310 barometer.
+In the I2C protocol, every device on the bus must have a unique address. Both DPS310 chips use I2C address `0x76`. When ArduPilot queries address `0x76`, **both chips reply simultaneously**. Their data collides, the bus jams, the flight controller crashes, and the boot loop begins.
 
-* **The Conflict:** Both chips use the exact same I2C address (typically `0x76`). When ArduPilot queries that address, both chips reply simultaneously. The data collides, the bus jams, and the flight controller crashes.
+This conflict can exist even with perfect wiring and no physical shorts — it is a firmware-level address collision.
 
-### 24.2 The 2-Wire Hardware Isolation Test
+---
 
-To definitively prove an I2C line conflict without software interference:
+### Step 24.1 — The 2-Wire Hardware Isolation Test
 
-1. Keep the GPS module connected to the flight controller.
-2. Desolder **only** the `SDA` and `SCL` wires. Leave `5V`, `GND`, `TX`, and `RX` connected.
+To definitively confirm the conflict is on the I2C lines specifically (and not UART or power):
+
+1. Keep the GPS module fully connected (5V, GND, TX, RX all connected).
+2. **Desolder only the `SDA` and `SCL` wires** from the SpeedyBee.
 3. Power the drone.
-4. If the log reads `ArduPilot Ready` and `Barometer 1 calibration complete`, the problem is strictly confined to the I2C lines.
+4. If the log reads `ArduPilot Ready` and `Barometer 1 calibration complete`, the conflict is strictly on the I2C lines — confirmed.
 
-### 24.3 Forcing ArduPilot to Ignore the External Barometer
+This test proves the GPS's UART (position data) and power connections are fine, and only the I2C barometer inside the GPS is causing the problem.
 
-To retain the GPS functionality without crashing the bus, you must instruct ArduPilot to ignore the secondary barometer inside the GPS puck.
+---
 
-1. Connect to QGC and navigate to **Parameters**.
-2. Search for **`BARO_PROBE_EXT`**.
-3. Set this value to **`0`**. This disables external I2C barometer probing.
+### Step 24.2 — Fix: Disable External Barometer Probing
+
+In QGC Parameters:
+
+1. Search for **`BARO_PROBE_EXT`**.
+2. Set the value to **`0`**.
+3. Click Write/Save.
 4. Reboot the flight controller.
 
----
-
-## 25. Resolving "Compass Not Healthy" Errors
-
-Once the Barometer address clash is resolved and the drone boots successfully (`ArduPilot Ready`), a `Compass Not Healthy` error will typically remain.
-
-### 25.1 Unlocking Advanced Parameters
-
-ArduPilot 4.5.4 may hide necessary compass parameters.
-
-1. In QGC, click the **QGC Logo > Settings (Gears)**.
-2. Under **General > User Experience**, change the **Parameter mode** to **Advanced** (or check "Enable all parameters").
-
-### 25.2 Forcing the Compass Driver
-
-Instead of using a generic typemask, manually enable the compass systems.
-
-1. Navigate to **Parameters**.
-2. Search for **`COMPASS_ENABLE`** and set to **`1`**.
-3. Search for **`COMPASS_AUTO_ROT`** and set to **`1`** (allows ArduPilot to auto-detect the GPS puck orientation).
-4. Reboot the flight controller.
-
-### 25.3 Mandatory Compass Calibration
-
-ArduPilot will strictly flag any compass as "Not Healthy" until it receives a complete, valid data matrix.
-
-1. Go to **Vehicle Setup > Sensors > Compass**.
-2. Click **Clear** or **Reset** to purge old, corrupted data from previous I2C crashes.
-3. Click **Calibrate** and perform the 6-axis physical rotation sequence. The error will clear immediately upon successful calibration.
-
+This single parameter change instructs ArduPilot not to probe the I2C bus for external barometers. The internal DPS310 on the SpeedyBee continues to function. The GPS's DPS310 is ignored. The address collision is eliminated.
 
 ---
 
-# Documentation: ArduPilot 4.5+ Parameter Management & Calibration Failures
+<a name="section-25"></a>
+## Section 25 — Resolving "Compass Not Healthy" Errors
 
-## [CRITICAL UPDATE TO PREVIOUS DOCUMENTATION]
-
-**Changes applied to Section 21.2 & 25 (Compass Configuration)**
-In modern ArduPilot firmware (V4.5.x and newer), the `COMPASS_TYPEMASK` parameter is deprecated. Do not search for it. Compass management is now handled via individual enable/disable toggles to prevent I2C bus clutter. Furthermore, QGroundControl (QGC) actively hides these parameters by default to simplify the user interface.
+After the barometer conflict is resolved and the drone boots to `ArduPilot Ready`, a `Compass Not Healthy` error typically remains. ArduPilot requires a complete, valid calibration matrix before it will accept any compass as healthy.
 
 ---
 
----
+### Step 25.1 — Unlock Advanced Parameters
 
-## 26. Unhiding Advanced Parameters in QGC
+Some required compass parameters are hidden in QGC by default:
 
-To resolve advanced hardware conflicts, the QGC interface must be forced to display all backend parameters.
-
-1. Click the **QGC Logo** (top left) $\rightarrow$ **Application Settings** (Gear icon).
-2. Under the **General** tab, locate the **User Experience** section.
-3. Change **Parameter mode** to **Advanced** (or check "Enable all parameters").
-4. Return to the Vehicle Setup menu. The full parameter list will now be visible.
+1. Click the **QGC Logo** (top left) → **Application Settings** (gear icon).
+2. Under the **General** tab → **User Experience** section.
+3. Set **Parameter mode** to **Advanced** (or check "Enable all parameters").
+4. Return to Vehicle Setup → Parameters.
 
 ---
 
-## 27. Managing "Ghost" Compasses (I2C Clutter)
+### Step 25.2 — Force Enable the Compass Driver
 
-ArduPilot supports up to 8 simultaneous compasses. The SpeedyBee F405 lacks an internal compass, meaning the only valid compass is the external GPS puck (Compass 1). If ArduPilot leaves slots 2 through 8 active, it creates "ghost" compasses that poll the empty I2C bus, causing calibration failures.
+In QGC Parameters:
 
-1. Navigate to **Parameters**.
-2. Search for `COMPASS_USE`.
-3. Ensure **`COMPASS_USE`** (Compass 1) = `1` (Checked).
-4. Set **`COMPASS_USE2`** through **`COMPASS_USE8`** = `0` (Unchecked).
-5. Reboot the flight controller.
+- Search **`COMPASS_ENABLE`** → set to `1` (enabled)
+- Search **`COMPASS_AUTO_ROT`** → set to `1` (allows ArduPilot to automatically detect and correct for the GPS puck's physical orientation)
+- Reboot the flight controller.
 
 ---
 
-## 28. Resolving Standard PreArm Failsafes
+### Step 25.3 — Mandatory Compass Calibration
 
-Once the hardware bus is stable (`ArduPilot Ready`), the system will enforce PreArm safety checks. These must be cleared before the drone can arm.
+ArduPilot flags any compass as "Not Healthy" until it has received a complete valid calibration dataset. Previous I2C crashes may have written corrupted data.
 
-### 28.1 `Critical: PreArm: Battery 1 unhealthy`
-
-* **Cause:** The flight controller is powered solely by USB (5V). ArduPilot expects full flight voltage (e.g., 3S/4S LiPo).
-* **Fix:** Plug in the LiPo battery.
-
-### 28.2 `Critical: PreArm: Radio failsafe on`
-
-* **Cause:** No valid RC signal is detected from the receiver.
-* **Fix:** Power on the radio transmitter. Ensure it is bound to the receiver (solid green LED). Navigate to the **Radio** tab in QGC and perform a full stick calibration.
-
-### 28.3 `Critical: PreArm: Throttle below failsafe / Check FS_THR_VALUE`
-
-* **Cause:** The throttle stick's lowest PWM value is dropping below the configured failsafe threshold.
-* **Fix:** 1. Complete Radio Calibration first.
-2. Check the lowest PWM value of your throttle stick (usually around 1000).
-3. In Parameters, set **`FS_THR_VALUE`** to a number at least 10 units *below* your lowest stick value, but above the "Radio Off" value (e.g., set to `975`).
+1. Go to **Vehicle Setup → Sensors → Compass**.
+2. Click **Clear** or **Reset** — this purges corrupted offset data from previous crash events.
+3. Click **Calibrate**.
+4. Perform the 6-axis physical rotation:
+   - Hold the drone and rotate it slowly and smoothly through all orientations.
+   - The goal is to trace a sphere in 3D space — expose every face of the compass to every direction.
+   - Continue rotating until the progress bar completes.
+5. Click **Save**. The `Compass Not Healthy` error will clear immediately upon successful calibration.
 
 ---
 
-## 29. Resolving "Cannot start compass thread" (QGC Error)
+<a name="section-26"></a>
+## Section 26 — Unhiding Advanced Parameters in QGC
 
-If `COMPASS_DEV_ID` shows a valid hardware ID (e.g., `855297`) but QGC returns `Cannot start compass thread` when clicking Calibrate, the software is locked out of the hardware initialization process.
+QGC hides many ArduPilot parameters by default to simplify the interface for beginners. For advanced troubleshooting you need full access.
 
-### 29.1 Mandatory Prerequisite: Accelerometer Calibration
+### Two Places to Unlock
 
-The compass calibration thread relies on the Extended Kalman Filter (EKF). The EKF cannot start the compass thread if it does not know which way is "down."
+**Method 1 — Application-level unlock:**
+1. Click **QGC Logo** → **Application Settings** → **General** → **User Experience**.
+2. Set **Parameter mode** to **Advanced**.
 
-* **Fix:** You must complete the 6-axis Accelerometer Calibration *before* attempting the Compass Calibration.
+**Method 2 — Parameter screen dropdown:**
+1. Go to **Vehicle Setup → Parameters**.
+2. In the top-left corner, change the dropdown from **Standard** to **Full Parameter List**.
 
-### 29.2 The "Clean Slate" Power Sequence
+Both changes may be needed for different parameters. Apply both if a parameter you need is not appearing in search results.
 
-A dirty boot state will lock the thread. You must execute a hard reset:
+---
 
-1. Close QGC entirely.
-2. Unplug USB and LiPo battery.
-3. Plug in the **LiPo battery first** (to fully power the GPS/Compass).
-4. Plug in the **USB cable**.
-5. Open QGC and re-attempt calibration.
+<a name="section-27"></a>
+## Section 27 — Managing "Ghost" Compasses (I2C Clutter)
 
-### 29.3 Adjusting Calibration Fitness (Magnetic Noise)
+### The Problem
 
-If the thread starts but instantly crashes, ambient magnetic interference from the drone frame is too high for the default strictness parameters.
+ArduPilot supports up to 8 simultaneous compasses. The SpeedyBee F405 V3/V4 has **no internal compass**. Only the external GPS puck (Compass 1) is a real compass. If ArduPilot polls compass slots 2 through 8, it sends I2C queries to addresses that have no device — the bus receives no reply, causing timeouts that interfere with calibration.
 
-1. Search for parameter **`COMPASS_CAL_FIT`**.
-2. Increase the value from the default (`16` or `20`) to **`32`** or **`48`**. This relaxes the algorithmic strictness.
+### Fix
 
-### 29.4 Bypass QGC GUI (MAVLink Console Fallback)
+In QGC Parameters:
 
-If the QGC user interface is bugged, you can force the calibration thread to spawn via command line.
+| Parameter | Value | Notes |
+|-----------|-------|-------|
+| `COMPASS_USE` | `1` | Compass 1 (the GPS puck) — must be enabled |
+| `COMPASS_USE2` | `0` | Disabled — no compass here |
+| `COMPASS_USE3` through `COMPASS_USE8` | `0` | All disabled |
 
-1. Go to **Analyze Tools $\rightarrow$ MAVLink Console**.
+Reboot the flight controller after making changes.
+
+> **Version note:** In ArduPilot V4.5+, the old `COMPASS_TYPEMASK` parameter is deprecated. Do not search for it. Use the individual `COMPASS_USE` toggles described above.
+
+---
+
+<a name="section-28"></a>
+## Section 28 — Standard PreArm Failsafes
+
+Once the I2C bus is stable and `ArduPilot Ready` is displayed, the system enforces pre-arm safety checks. All of the following must be cleared before the drone can arm.
+
+| Error Message | Root Cause | Fix |
+|--------------|-----------|-----|
+| `PreArm: Battery 1 unhealthy` | FC powered by USB only (5V). ArduPilot expects flight battery voltage (e.g., 11.1V for 3S). | Plug in the LiPo battery. |
+| `PreArm: Radio failsafe on` | No valid RC signal detected from the receiver. | Power on the transmitter. Verify receiver binding (solid green LED on receiver). Run Radio calibration in QGC. |
+| `PreArm: Throttle below failsafe` / `Check FS_THR_VALUE` | Throttle stick PWM at zero is equal to or below the failsafe threshold. | Complete Radio Calibration first, then set `FS_THR_VALUE = 950` (see Section 35). |
+| `PreArm: Logging Failed` | SD card missing, wrong format, or too slow. | See Section 43 for full SD card and logging diagnostics. |
+
+---
+
+<a name="section-29"></a>
+## Section 29 — Resolving "Cannot Start Compass Thread"
+
+### Error: `Cannot start compass thread`
+
+This error appears in QGC when clicking Calibrate in the Compass section, even when `COMPASS_DEV_ID` shows a valid hardware ID (e.g., `855297`).
+
+---
+
+### Step 29.1 — Mandatory Prerequisite: Accelerometer Calibration First
+
+The compass calibration thread depends on the **Extended Kalman Filter (EKF3)**. The EKF requires knowing which direction is "down" before it can start any other calibration thread. Without a completed accelerometer calibration, the EKF cannot initialize, and the compass thread cannot start.
+
+**You must complete the 6-axis Accelerometer Calibration before attempting Compass Calibration.** (Section 9.3)
+
+---
+
+### Step 29.2 — The "Clean Slate" Power Sequence
+
+A dirty boot state — where the FC was previously in an error state — can lock the calibration thread. Execute a hard reset:
+
+1. Close QGC completely on the laptop.
+2. Unplug the USB cable from the SpeedyBee.
+3. Unplug the LiPo battery.
+4. Plug in the **LiPo battery first** — this fully powers the GPS and compass.
+5. Plug in the **USB cable**.
+6. Open QGC and reattempt calibration.
+
+The order (LiPo before USB) is important — it ensures the compass has stable power before ArduPilot starts querying it.
+
+---
+
+### Step 29.3 — Adjusting Calibration Fitness for Magnetic Noise
+
+If the calibration thread starts but immediately crashes, the drone's immediate environment has too much magnetic interference for the default algorithm strictness.
+
+In QGC Parameters:
+- Search **`COMPASS_CAL_FIT`**
+- Increase from default (`16`) to `32` or `48`
+
+Higher values relax the strictness of the calibration algorithm, accepting data with more variance. This is appropriate for environments with nearby motors, ESCs, power cables, or metal structures.
+
+---
+
+### Step 29.4 — MAVLink Console Fallback
+
+If the QGC graphical interface is bugged and the calibration button is unresponsive:
+
+1. Go to **Analyze Tools → MAVLink Console**.
 2. Type `magcal start` and press Enter.
-3. If the command is accepted, manually rotate the drone through all axes even if no progress bar is visible.
+3. Immediately pick up the drone and perform 6-axis rotations even if no progress bar appears.
+
+This bypasses the GUI entirely and directly commands the ArduPilot firmware to begin calibration.
 
 ---
 
+<a name="section-30"></a>
+## Section 30 — UI-Induced Thread Crashes
 
-# Documentation: Resolving QGC Thread Errors & Pre-Arm Calibration Flags
+### When the Hardware Is Fine but QGC Crashes the Thread
 
-## [CRITICAL UPDATE TO PREVIOUS DOCUMENTATION]
-
-**Changes applied to Section 27 (Managing Ghost Compasses) & Section 29 (Thread Errors)**
-If `COMPASS_DEV_ID` displays a valid hardware ID (e.g., `855297`) but QGroundControl (QGC) still returns `Cannot start compass thread`, the root cause is frequently a priority assignment failure or a custom orientation matrix conflict within the QGC user interface, rather than a pure ArduPilot parameter issue.
-
+If `COMPASS_DEV_ID` shows a valid ID but QGC returns `Cannot start compass thread` after completing all prerequisites in Section 29, the QGC interface itself is sending conflicting commands.
 
 ---
 
-## 30. Resolving UI-Induced Thread Crashes
+### Step 30.1 — Clear Custom Autopilot Rotation
 
-The QGC calibration interface can send conflicting commands to ArduPilot, causing the calibration thread to abort immediately.
+If a custom orientation matrix is selected in QGC, it attempts to apply a mathematical rotation transformation that can conflict with raw EKF data:
 
-### 30.1 Clear Custom Autopilot Rotations
+1. Go to **Vehicle Setup → Sensors → Compass**.
+2. Find the **Autopilot Rotation** dropdown.
+3. Set it to **`None`** (also shown as `Rotation_None`).
 
-If the QGC UI has a custom orientation selected, it attempts to apply a mathematical matrix that does not align with the raw EKF data, crashing the thread.
-
-1. Navigate to **Vehicle Setup > Sensors > Compass**.
-2. Locate the **Autopilot Rotation** dropdown.
-3. Change it from `Custom 1` (or any other custom value) to **`None`** (or `Rotation_None`).
-*(Note: This assumes the flight controller is mounted facing forward and perfectly flat).*
-
-### 30.2 Assign Sensor Priority
-
-ArduPilot cannot initiate a calibration thread for a sensor that lacks an assigned priority level.
-
-1. In the Compass calibration screen, locate the active compass (the one with the "Use Compass" box checked).
-2. Ensure the priority dropdown is explicitly set to **`Priority 1`**. If it reads `Not Set`, the thread will fail.
-
-### 30.3 Disable Fast Calibration
-
-"Fast Calibration" is designed for massive, unmovable vehicles and relies on in-flight estimation. It will cause desktop calibration threads to fail on standard drones.
-
-1. Ensure the **Fast Calibration** checkbox is **unchecked**.
+This assumes the flight controller is mounted facing forward and level. If your FC is mounted at an angle, you will need to set the correct rotation value after initial calibration is complete.
 
 ---
 
-## 31. The MAVLink Console Calibration Override
+### Step 30.2 — Assign Sensor Priority
 
-If the QGC graphical interface remains bugged (`Cannot start compass thread`) despite correct parameters, you must bypass the GUI and force the calibration via command-line MAVLink instructions.
+ArduPilot cannot start a calibration thread for a sensor that has no assigned priority:
 
-1. Navigate to **Analyze Tools > MAVLink Console**.
+1. In the Compass calibration screen, find the active compass (the one with "Use Compass" checked).
+2. Ensure the priority dropdown explicitly reads **`Priority 1`**.
+3. If it reads `Not Set`, click and select Priority 1.
+
+---
+
+### Step 30.3 — Disable Fast Calibration
+
+"Fast Calibration" is designed for large aircraft (fixed-wing planes, large hexacopters) where the vehicle cannot easily be rotated by hand. It uses in-flight estimation and will break desktop calibration for standard quadcopters:
+
+- Ensure the **Fast Calibration** checkbox is **unchecked**.
+
+---
+
+<a name="section-31"></a>
+## Section 31 — MAVLink Console Calibration Override
+
+### When to Use This
+
+Use the MAVLink Console override when the QGC graphical calibration interface remains non-functional despite correct parameters, correct wiring, and correct power sequencing.
+
+### Procedure
+
+1. Go to **Analyze Tools → MAVLink Console**.
 2. Type exactly: `magcal start 1` and press **Enter**.
-*(Note: The `1` specifies that ArduPilot should only attempt to calibrate the compass assigned to Priority 1, bypassing any ghost compasses).*
-3. **Crucial:** The console may not provide immediate text feedback. The text may simply disappear. **Do not wait for a prompt.**
-4. Immediately pick up the drone and perform the 6-axis rotation "hand dance" for 60 seconds.
-5. To check the status of the background thread, type: `magcal status`.
+   - The `1` parameter specifies calibration of only the compass assigned to Priority 1, bypassing any ghost compasses that might cause the thread to fail.
+3. **Do not wait for feedback.** The console may display nothing or simply show the command disappear. This is normal — the calibration thread has started in the background.
+4. Immediately pick up the drone and perform the 6-axis rotation for approximately **60 seconds**, covering all orientations as thoroughly as possible.
+5. To check calibration progress:
+   ```
+   magcal status
+   ```
 
 ---
 
-## 32. Handling "Calibration Complete" but Persistent Red Errors
+<a name="section-32"></a>
+## Section 32 — Handling "Calibration Complete" but Persistent Red Errors
 
----
+### Symptom
 
-If the calibration progress bar completes and turns green (or the log states `MAG0 initial yaw alignment complete`), but the Compass tab remains red and throws a `PreArm: Compass not calibrated` error, the flight controller has not yet transferred the new offset data into active memory.
+The calibration progress bar completes and turns green. The QGC log may show `MAG0 initial yaw alignment complete`. But the Compass tab remains red and still shows `PreArm: Compass not calibrated`.
 
-### 32.1 The Mandatory Hard Reboot
+### Cause
 
-ArduPilot caches the pre-arm failure state. It will not re-evaluate the compass health until the system is completely power-cycled.
+ArduPilot caches the pre-arm failure state in RAM. It does not re-evaluate sensor health until the system is completely power-cycled — a software reboot via the QGC button is not sufficient.
 
-1. Do not use the software reboot button.
-2. Unplug the **LiPo Battery**.
-3. Unplug the **USB Cable**.
-4. Wait 10 seconds to allow capacitors to drain.
+### Step 32.1 — The Mandatory Hard Reboot
+
+1. Do **not** use the software reboot button in QGC.
+2. Unplug the LiPo battery.
+3. Unplug the USB cable.
+4. Wait **10 seconds** — this allows capacitors on the board to fully discharge and clears all in-memory state.
 5. Reconnect power. The red error will clear.
 
-### 32.2 Disabling Auto-Learning Override
+---
 
-If the error persists after a hard reboot, ArduPilot's in-flight learning algorithm may be rejecting the manual ground calibration.
+### Step 32.2 — Disable Auto-Learning Override
 
-1. Navigate to **Parameters**.
-2. Search for **`COMPASS_LEARN`**.
-3. Set the value to **`0`** (Disabled). This forces the EKF to strictly utilize the offsets generated during the manual rotation.
+If the `PreArm: Compass not calibrated` error persists after a hard reboot, ArduPilot's in-flight learning algorithm may be overriding the manual ground calibration:
 
+In QGC Parameters:
+- Search **`COMPASS_LEARN`**
+- Set to **`0`** (Disabled)
+
+This forces the EKF to use the offsets gathered during your manual calibration rotation, rather than waiting to recalculate them during flight.
 
 ---
 
-# Documentation: Radio Integration & Final Pre-Arm Failsafes
+<a name="section-33"></a>
+## Section 33 — In-Flight Calibration Fallback (`COMPASS_LEARN`)
 
-## [CRITICAL UPDATE TO PREVIOUS DOCUMENTATION]
+### When to Use This
 
-**Changes applied to Section 32 (Handling Calibration Errors)**
-If the graphical calibration consistently fails or throws ghost errors despite successful log entries, ArduPilot has a built-in fallback mechanism to calibrate the compass during flight.
+Use this method only when ground calibration is completely blocked by persistent UI issues, and you have access to an open outdoor area with GPS coverage.
 
-### 33. The "In-Flight" Calibration Fallback (`COMPASS_LEARN`)
+### Procedure
 
-If ground calibration is completely blocked by UI glitches, you can force ArduPilot to learn the magnetic offsets dynamically.
+1. In QGC Parameters, set **`COMPASS_LEARN`** = **`3`**.
+2. The Messages tab will confirm: `CompassLearn: Initialised`.
+3. Take the drone outdoors to a location with clear sky visibility and acquire a **3D GPS lock** (typically indicated by a solid blue LED on the GPS puck or a GPS fix indicator in QGC).
+4. Arm the drone in **Stabilize mode only**. Do not use Loiter or Auto — these require a healthy compass to function.
+5. Fly slow, smooth circles and figure-eight patterns for **1–2 minutes**, covering a variety of headings.
+6. When sufficient data is collected, ArduPilot will log: `CompassLearn: finished`.
+7. `COMPASS_LEARN` automatically resets to `0`.
+8. The compass error is permanently cleared.
 
-1. Navigate to **Parameters**.
-2. Search for **`COMPASS_LEARN`**.
-3. Set the value to **`3`**.
-4. The Messages tab will display `CompassLearn: Initialised`.
-5. **Execution:** Take the drone outside to acquire a 3D GPS lock. Arm the drone in **Stabilize** mode only (do not use Loiter or Auto). Fly in slow circles and figure-eights for 1–2 minutes.
-6. Once sufficient data is gathered, the log will output `CompassLearn: finished`, the parameter will reset to `0`, and the compass error will permanently clear.
-
----
-
-## 34. Resolving Radio Failsafes (FlySky iA6B Integration)
-
-Once the compass is calibrated, ArduPilot will evaluate the radio link. If the log displays `Critical: PreArm: Radio failsafe on`, the flight controller is not receiving a valid control signal from the receiver.
-
-### 34.1 The PWM/Servo Pin Misconception
-
-**Do not connect the horizontal servo pins (CH1 - CH6).** Modern flight controllers do not use legacy PWM (one wire per channel). ArduPilot requires a multiplexed digital signal (i-BUS or SBUS) transmitted over a single wire.
-
-### 34.2 FlySky iA6B i-BUS Wiring
-
-The FlySky iA6B receiver features a dedicated digital output port.
-
-1. Locate the vertical cluster of 3 pins on the far right edge of the receiver. This is labeled **SENS** or **i-BUS**.
-2. **Wiring to SpeedyBee F405:**
-* **Top Pin (Signal):** Connect to a UART RX pad (e.g., `RX2` or `SBUS`).
-* **Middle Pin (Power):** Connect to a `5V` pad.
-* **Bottom Pin (Ground):** Connect to a `G` (Ground) pad.
-
-
+> **Safety note:** Flying with an uncalibrated compass means GPS-assisted modes (Loiter, Auto, RTL) are unavailable and unreliable. Stabilize mode uses only the gyroscope and accelerometer for stability — it is safe to fly but does not hold position.
 
 ---
 
-### 34.3 Transmitter Configuration
+<a name="section-34"></a>
+## Section 34 — Radio Integration (FlySky FS-i6 & iA6B)
 
-The remote control must be instructed to output the digital signal.
+### The PWM vs. Digital Protocol Distinction
 
-1. Turn on the FlySky FS-i6.
-2. Hold `OK` to enter the menu.
-3. Navigate to **System Setup > RX Setup > i-BUS Setup** (or `PPM Output` on older firmware).
-4. Ensure the output is set to **i-BUS** (or turn PPM to `On` if i-BUS is unavailable).
+**Do not connect the horizontal servo pins (CH1–CH6) on the iA6B receiver.** These are legacy PWM outputs — one wire per channel, each carrying an analog pulse signal. Modern flight controllers and ArduPilot require a **multiplexed digital signal** (i-BUS or SBUS) — all channels over a single wire, with precise digital encoding.
 
----
-
-## 35. Resolving Throttle Failsafes (`Check FS_THR_VALUE`)
-
-If the log displays `Critical: PreArm: Throttle below failsafe` or `Check FS_THR_VALUE`, ArduPilot's emergency system is triggering because the baseline throttle signal is lower than the configured safety threshold.
-
-### 35.1 Adjusting the Safety Buffer
-
-FlySky receivers typically output a PWM value of exactly `1000` when the throttle stick is at zero. If the ArduPilot failsafe threshold is set to `1000` or higher, resting the stick at zero triggers a panic state (simulating a lost connection).
-
-1. Navigate to **Parameters**.
-2. Search for **`FS_THR_VALUE`**.
-3. Set the value to **`975`**.
-* *Logic:* This creates a 25-point safety buffer. The drone recognizes `1000` as zero throttle, but will only trigger a failsafe if the signal drops to `975` (which only happens if the radio physically powers off or disconnects).
-
-
+Using PWM pins will result in:
+- Erratic control inputs
+- The `Radio failsafe on` pre-arm error
+- Channels appearing in QGC but with no movement or incorrect values
 
 ---
 
-## 36. Final Radio Calibration Sequence
+### Step 34.1 — Locate the i-BUS Port on the iA6B
 
-Even with perfect wiring and parameters, ArduPilot will refuse to arm until the exact range of the transmitter gimbals has been mapped to the flight controller.
+The FlySky iA6B has two groups of pins:
+- **Horizontal row (CH1–CH6):** Legacy PWM output. Do not use.
+- **Vertical 3-pin cluster** on the far right edge of the receiver, labeled **SENS**, **i-BUS**, or **iBus servos**: This is the digital i-BUS output port.
 
-1. Open QGroundControl and navigate to the **Radio** tab (remote control icon).
-2. Ensure the transmitter is powered on and bound to the receiver.
-3. If the wiring is correct, the channel bars will be red and will move when you manipulate the sticks. (If the bars are grey and motionless, return to Section 34.2 and check your UART wiring).
+---
+
+### Step 34.2 — i-BUS Wiring to SpeedyBee F405
+
+| iA6B Pin | Position | SpeedyBee F405 Pad |
+|---------|----------|-------------------|
+| Signal (S) | Top pin | `RX2` or `SBUS` pad |
+| Power (V+) | Middle pin | `5V` pad |
+| Ground (G) | Bottom pin | `GND` or `G` pad |
+
+---
+
+### Step 34.3 — FlySky FS-i6 Transmitter Configuration
+
+The transmitter must be told to output the digital i-BUS signal instead of standard PPM:
+
+1. Turn on the FS-i6 transmitter.
+2. Hold the **OK** button to enter the menu system.
+3. Navigate to: **System Setup → RX Setup → i-BUS Setup**.
+   - On older firmware versions, this may appear as **PPM Output** — set to `On`.
+4. Ensure output is set to **i-BUS**.
+5. Hold **Cancel** to save and exit (the FS-i6 saves when you exit, not when you press OK).
+
+---
+
+<a name="section-35"></a>
+## Section 35 — Throttle Failsafes & `FS_THR_VALUE`
+
+### Why This Error Occurs
+
+FlySky receivers output a PWM value of approximately **`1000`** when the throttle stick is at the physical zero/bottom position. ArduPilot's throttle failsafe system is designed to detect a lost radio link — when the signal drops to zero, the PWM value falls below `FS_THR_VALUE` and ArduPilot triggers emergency procedures.
+
+If `FS_THR_VALUE` is set at or above `1000`, simply resting the throttle at zero mimics a lost radio link and puts ArduPilot in a permanent panic state.
+
+### Fix
+
+In QGC Parameters:
+- Search **`FS_THR_VALUE`**
+- Set to **`950`**
+
+This creates a 50-point safety buffer. Normal zero throttle (≈1000) is above the threshold. Only a genuine radio power-off (which causes the PWM to drop to zero or near-zero) triggers the failsafe.
+
+> **Note:** If `950` still triggers the failsafe, lower it further to `925` or `900`. The physical radio-off PWM value is typically near 0 or below 900, so there is plenty of margin.
+
+> **Correction from earlier documentation versions:** Some sections listed `FS_THR_VALUE = 975`. The correct, standardized value is **`950`** as it provides a larger safety margin while remaining well above the radio-off threshold.
+
+---
+
+<a name="section-36"></a>
+## Section 36 — Final Radio Calibration Sequence
+
+ArduPilot will not arm until the exact PWM range of the transmitter sticks has been mapped. This teaches ArduPilot what value represents "full throttle," "zero throttle," "full left," "full right," etc.
+
+### Procedure
+
+1. Open QGC and go to the **Radio** tab (transmitter/remote control icon).
+2. Verify the transmitter is powered on and the receiver is bound (solid green LED on the receiver).
+3. **If wiring is correct:** Channel bars in QGC will be red and will move when you move the sticks.
+   **If channel bars are grey and motionless:** The receiver is not sending data. Return to Section 34 and verify UART wiring and i-BUS configuration.
 4. Click **Calibrate**.
-5. Move both sticks to their extreme maximum and minimum boundaries (all corners). Flip all assigned switches.
+5. Follow the prompts: Move both sticks to all four extreme corners (up-left, up-right, down-left, down-right). Flip all assigned switches to both positions.
 6. Click **Save/Apply**.
 
 ---
 
-## 37. Final Arming Checklist
+<a name="section-37"></a>
+## Section 37 — Final Arming Checklist
 
-Before issuing the Arm command, verify the resolution of all critical flags:
+Before issuing the arm command, verify all pre-arm flags are cleared:
 
-| Pre-Arm Error Flag | Resolution Status | Required Action |
-| --- | --- | --- |
-| **Baro: not healthy** | Cleared | I2C conflict resolved. `BARO_PROBE_EXT` = 0. |
-| **Compass not calibrated** | Cleared | Calibration saved. Hard reboot performed. |
-| **Radio failsafe on** | Cleared | iA6B wired via i-BUS. Sticks calibrated in QGC. |
-| **Throttle below failsafe** | Cleared | `FS_THR_VALUE` set to 975. |
+| Pre-Arm Error Flag | Resolution | Parameter/Action |
+|--------------------|-----------|-----------------|
+| `Baro: not healthy` | I2C conflict resolved | `BARO_PROBE_EXT = 0`; GPS I2C wiring corrected |
+| `Compass not calibrated` | Calibration completed | Hard reboot performed after calibration (Section 32) |
+| `Radio failsafe on` | iA6B wired via i-BUS | Sticks calibrated in QGC Radio tab |
+| `Throttle below failsafe` | Failsafe threshold lowered | `FS_THR_VALUE = 950` |
+| `Logging Failed` | SD card formatted correctly | FAT32, 32KB clusters, ≤32GB card |
+| `Battery 1 unhealthy` | LiPo connected | Remove USB-only power |
 
-When the HUD displays `ArduPilot Ready` without critical flags, pull the throttle stick to the bottom right corner for 3 seconds. The motors will spin.
+### Arming the Motors
 
----
+When QGC HUD displays **`ArduPilot Ready`** with no critical flags:
 
-# Documentation: Radio Integration, Flight Modes & In-Flight Calibration
+Pull the **throttle stick to the bottom-right corner** and hold for **3 seconds**. The motors will begin to spin at minimum idle speed.
 
-## 38. FlySky FS-i6 & iA6B Receiver i-BUS Setup
-
-Modern flight controllers do not use legacy PWM (individual wires for channels 1-6). You must use a single-wire digital multiplexed protocol. For the FlySky iA6B, this is i-BUS.
-
-### 38.1 Receiver Wiring (i-BUS Port)
-
-Do not connect anything to the horizontal servo pins. Locate the vertical 3-pin cluster on the top-right edge of the receiver labeled **iBus servos** (or **SENS**).
-
-1. **Top Pin (S / Signal):** Connect to `RX2` (or `SBUS`) on the SpeedyBee F405 V4.
-2. **Middle Pin (V+ / Power):** Connect to a `5V` pad.
-3. **Bottom Pin (G / Ground):** Connect to a `G` pad.
-
-### 38.2 Transmitter Configuration
-
-The remote must be forced to output the digital i-BUS signal.
-
-1. Turn on the FS-i6 and hold **OK** to enter the menu.
-2. Go to **System Setup > RX Setup > i-BUS Setup** (or `PPM Output` on older models).
-3. Ensure the output is set to **i-BUS**.
-4. Hold **Cancel** to save and exit.
+> **Always remove propellers during bench testing.** Never arm with propellers attached unless you are prepared for the drone to fly.
 
 ---
 
-## 39. Configuring ArduPilot for i-BUS
+<a name="section-38"></a>
+## Section 38 — Flight Modes & Arm Switch Configuration (FlySky FS-i6)
 
-ArduPilot must be instructed to listen for the RC signal on the specific UART port where the receiver is wired.
+### Step 38.1 — Map Transmitter Switches to Channels
 
-1. In QGroundControl, navigate to **Parameters**.
-2. If wired to `RX2`, search for **`SERIAL2_PROTOCOL`**. Set it to **`23`** (RCIN).
-3. Search for **`SERIAL2_BAUD`**. Set it to **`115`** (115200).
-4. Write parameters and reboot the flight controller.
-
----
-
-## 40. Overriding Persistent Radio & Throttle Failsafes
-
-FlySky transmitters frequently output a baseline value around `1000` when the throttle is at zero. If ArduPilot's failsafe threshold is too high, it traps the system in a loop of `Radio failsafe on` and `Throttle below failsafe` errors, even when the connection is perfect.
-
-### 40.1 Drop the Failsafe Threshold
-
-You must force the software safety floor below the physical limit of the transmitter.
-
-1. Search for **`FS_THR_VALUE`**.
-2. Drop the value from the default (`975`) down to **`950`**, **`925`**, or even **`900`**.
-3. Write parameters. The `Radio Failsafe Cleared` message should now remain stable.
-
-### 40.2 Resolve `Arm: Throttle too high`
-
-Once the failsafe is cleared, ArduPilot will reject arming if it does not know the exact physical range of your sticks.
-
-1. Go to the **Radio** tab in QGC.
-2. Click **Calibrate**.
-3. Move both sticks to their absolute physical limits (all corners).
-4. Click **Save/Apply**. This maps the exact zero point, clearing the throttle error.
-
----
-
-## 41. In-Flight Compass Calibration (`COMPASS_LEARN`)
-
-If the QGC calibration thread consistently crashes or throws `PreArm: Compass not calibrated` despite green progress bars, bypass ground calibration entirely using ArduPilot's automatic in-flight learning.
-
-1. Go to **Parameters** and search for **`COMPASS_LEARN`**.
-2. Set the value to **`3`**.
-3. The log will output `CompassLearn: Initialised`.
-4. **Execution:** Ensure the GPS has a 3D lock (solid blue LED). Arm the drone in **Stabilize** mode only. Fly slow circles and figure-eights.
-5. The log will output `CompassLearn: finished`. The parameter will automatically reset to `0`, and the compass error is permanently resolved.
-
----
-
-## 42. Configuring Flight Modes and Arm Switches (FlySky FS-i6)
-
-To control the drone safely, you must map the physical switches on the transmitter to auxiliary channels, and then assign those channels to ArduPilot actions.
-
-### 42.1 Map Switches on the Transmitter
+The FS-i6 supports 6 channels. Channels 5 and 6 are used for flight modes and arming respectively.
 
 1. Hold **OK** to enter the FS-i6 menu.
-2. Go to **Functions Setup > Aux. channels**.
-3. Set **Channel 5** to **SwC** (the 3-position switch for flight modes).
-4. Set **Channel 6** to **SwD** (the 2-position switch for arming).
+2. Navigate to **Functions Setup → Aux. channels**.
+3. Set **Channel 5** to **SwC** (the 3-position switch — used for flight modes).
+4. Set **Channel 6** to **SwD** (the 2-position switch — used for arming).
 5. Hold **Cancel** to save.
 
-### 42.2 Assign Flight Modes in QGC
+---
 
-1. In QGC, go to the **Flight Modes** tab.
-2. Set the **Mode Channel** to **Channel 5**.
-3. Toggle `SwC` on the remote to see which rows highlight green. Assign them as follows:
-* **Switch Up (Pos 1):** `Stabilize` (Manual leveling, required for first flight).
-* **Switch Middle (Pos 2):** `AltHold` (Automatically maintains altitude).
-* **Switch Down (Pos 3):** `Loiter` (GPS position hold).
+### Step 38.2 — Assign Flight Modes in QGC
 
+1. In QGC, navigate to the **Flight Modes** tab.
+2. Set **Mode Channel** to **Channel 5**.
+3. Toggle SwC to each position and observe which row highlights green. Assign:
 
-
-### 42.3 Assign the Arm/Disarm Switch
-
-A physical kill switch is mandatory for safety.
-
-1. Go to **Parameters** and search for **`RC6_OPTION`** (which corresponds to Channel 6 / SwD).
-2. Set the value to **`41`** (ArmDisarm).
-3. Write parameters. Flipping `SwD` up will now instantly arm the drone; flipping it down will instantly disarm it.
-
+| Switch Position | Mode | Description |
+|----------------|------|-------------|
+| SwC Up (Position 1) | `Stabilize` | Manual leveling using gyro/accelerometer. Required for first flight. No GPS dependency. |
+| SwC Middle (Position 2) | `AltHold` | Automatically maintains current altitude using barometer. Pilot controls horizontal movement. |
+| SwC Down (Position 3) | `Loiter` | GPS position hold. Drone holds current position and altitude. Requires healthy GPS and compass. |
 
 ---
 
-# Documentation: Arming Configuration, Motor Diagnostics & Logging Failures
+### Step 38.3 — Assign the Arm/Disarm Switch
 
-## 43. Configuring a Physical Arming Switch
-
-While ArduPilot allows arming via stick commands (Throttle Down + Yaw Right), a dedicated physical switch is significantly safer and faster for emergency disarming.
-
-### 43.1 Transmitter Configuration (FS-i6)
-
-1. Enter the FS-i6 menu (Hold `OK`).
-2. Navigate to **Functions Setup > Aux. channels**.
-3. Set **Channel 6** to **SwD** (the 2-position switch).
-4. Save and Exit.
-
-### 43.2 ArduPilot Parameter Configuration
-
-1. In QGroundControl, navigate to **Parameters**.
-2. Search for **`RC6_OPTION`**.
-3. Set the value to **`153`** (ArmDisarm).
-*(Note: Older firmware used `41`. ArduCopter V4.5+ frequently rejects `41` as an `Invalid channel option`. Use `153` to bypass this error).*
-4. Write parameters and reboot.
-
-### 43.3 Verifying Switch Travel (PWM Range)
-
-ArduPilot will strictly ignore the arm command if the switch does not send a high enough PWM value (typically >1800).
-
-1. Go to the **Radio** tab in QGC.
-2. Flip `SwD`.
-3. Observe the bar for **Channel 6**. It must move from the far left (~1000) to the far right (~2000).
-4. **Fix:** If the bar only moves halfway, go to the FS-i6 **Functions Setup > End Points** and increase Channel 6 to `120%` on both the high and low ends.
-
----
-
-## 44. Resolving Motor Rotation Failures
-
-If the drone arms successfully but one motor stutters, twitches, or fails to spin, you must isolate the hardware from the software configuration.
-
-### 44.1 The QGC Motor Test (Software Bypass)
-
-1. **REMOVE ALL PROPELLERS.**
-2. Navigate to **Vehicle Setup > Motors**.
-3. Slide the safety switch on the screen to enable testing.
-4. Click **Test Motor** for the failing unit.
-* **If it spins normally:** The hardware is perfect. The issue is a corrupted ESC calibration or a radio mixing error.
-* **If it stutters/fails:** The issue is physical.
-
-
-
-### 44.2 Hardware Diagnostics
-
-* **Phase Wire Disconnect:** A twitching motor usually indicates that one of the three wires connecting the motor to the ESC is loose, broken, or suffering from a cold solder joint.
-* **Mounting Screw Short:** If the screws securing the motor to the frame are too long, they will pierce the copper stator windings, creating an electrical short that prevents rotation.
-
-### 44.3 DShot Configuration
-
-Modern ESCs should not use legacy PWM or require manual end-point calibration.
-
-1. In Parameters, search for **`MOT_PWM_TYPE`**.
-2. Ensure it is set to **`4`** (DShot600).
-3. Write parameters and reboot. DShot is a digital protocol that is immune to throttle-range desynchronization.
-
----
-
-## 45. Resolving "Logging Failed" Pre-Arm Errors
-
-ArduPilot is configured by default to refuse arming if it cannot write flight telemetry to the onboard SD card. If you see `Logging Failed`, the SD card is missing, corrupted, or communicating too slowly.
-
-### 45.1 Hardware formatting (The `FAT32` Rule)
-
-The SpeedyBee F405 V4 cannot read `exFAT` partitions.
-
-* The SD card must be 32GB or smaller (or artificially partitioned to be smaller).
-* It must be formatted strictly to **FAT32** with a **32KB cluster size** (See Section 2 of this manual for exact formatting instructions).
-
-### 45.2 Slowing the SPI Bus
-
-If a valid FAT32 card is inserted but the error persists, the flight controller is attempting to write data faster than the SD card can accept it.
-
-1. In Parameters, search for **`BRD_SD_SLOWDOWN`**.
-2. Increase the value from `0` to **`2`** or **`5`**.
+1. In QGC Parameters, search **`RC6_OPTION`** (Channel 6).
+2. Set the value to **`153`** (ArmDisarm).
 3. Write parameters and reboot.
 
-### 45.3 Bypassing the Logging Requirement
+> **Critical firmware version note:** Older ArduPilot documentation listed `RC6_OPTION = 41`. **ArduCopter V4.5+ rejects `41` as an invalid channel option.** Always use `153` for V4.5 and newer.
 
-If you do not require flight logs or the SD card reader is physically broken, you can instruct ArduPilot to ignore the failure and permit arming.
-
-1. **Disable the Log Stream:** Search for **`LOG_BITMASK`** and set it to **`0`**.
-2. **Disable the Pre-Arm Check:** Search for **`ARMING_CHECK`**. Click the dropdown and uncheck **Logging Available**. (Alternatively, set to `0` for bench testing only).
-3. Write parameters and reboot. The drone will now arm without an SD card.
+Flipping SwD **up** arms the drone; flipping SwD **down** immediately disarms.
 
 ---
 
-# Documentation: Advanced Motor Diagnostics & Hardware Isolation
+### Step 38.4 — Verify Switch PWM Travel
 
-## 46. Resolving Symmetrical Throttle Lag (Slow Motor Spin)
+ArduPilot ignores the arm command if the switch PWM does not reach the required threshold (typically ≥1800 for arm):
 
-If all motors spin, but one accelerates noticeably slower than the others, the issue is typically a desynchronization between the ArduPilot throttle output and the ESC's calibrated range.
-
-### 46.1 ESC Calibration (PWM Only)
-
-If utilizing standard PWM, you must teach the ESCs the maximum and minimum signal values.
-
-1. **REMOVE ALL PROPELLERS.**
-2. Go to **Vehicle Setup > Sensors > ESC Calibration**. (If hidden, check the **Power** tab).
-3. Follow the on-screen prompts: Unplug battery $\rightarrow$ Click Start $\rightarrow$ Plug in battery $\rightarrow$ Wait for initialization tones $\rightarrow$ Move throttle stick to zero.
-
-### 46.2 Increasing Minimum Idle Speed
-
-If a motor struggles to overcome internal friction upon arming, the baseline voltage is too low.
-
-1. In Parameters, search for **`MOT_SPIN_ARM`**.
-2. Increase the value incrementally (e.g., from `0.10` to `0.15`).
-3. This applies higher baseline power to all motors immediately upon arming.
+1. Go to **QGC → Radio** tab.
+2. Flip SwD and observe **Channel 6**.
+3. The bar must travel from the far left (≈1000) to the far right (≈2000).
+4. **If the bar only moves halfway:** Go to the FS-i6 menu → **Functions Setup → End Points** → increase Channel 6 to **120%** on both the High and Low ends.
 
 ---
 
-## 47. Unhiding Advanced Parameters in QGC
+<a name="section-39"></a>
+## Section 39 — Configuring ArduPilot for i-BUS (UART Parameters)
 
-If critical configuration parameters (like `MOT_PWM_TYPE`) do not appear in the search results, QGroundControl is filtering the view to protect novice users.
+ArduPilot must be instructed to listen for RC input on the specific UART port where the iA6B is connected.
 
-1. Navigate to the **Parameters** screen.
-2. In the top-left corner, beneath the search bar, click the dropdown menu currently labeled **Standard**.
-3. Select **Full Parameter List** (or **Advanced**). All hidden ArduPilot parameters are now accessible.
+In QGC Parameters (assuming receiver is wired to `RX2`/UART2):
 
-### 47.1 Firmware-Specific Parameter Naming
+| Parameter | Value | Meaning |
+|-----------|-------|---------|
+| `SERIAL2_PROTOCOL` | `23` | RCIN — tells ArduPilot this port receives RC input |
+| `SERIAL2_BAUD` | `115` | 115200 baud (i-BUS protocol speed) |
 
-If `MOT_` parameters remain missing in the Full Parameter List, the firmware version utilizes alternate naming conventions:
+Write parameters and reboot the flight controller.
 
-* Search for **`SERVO_BLH_OTYPE`** (Alternative for DShot configuration).
-* Search for **`Q_M_`** (If you accidentally flashed QuadPlane firmware instead of ArduCopter, all motor parameters use this prefix).
-
----
-
-## 48. Diagnosing Asymmetrical Motor Stuttering (Twitching)
-
-If a motor twitches rapidly back and forth but fails to complete a revolution, it is **not** a software or calibration error. This is a hardware failure known as "Phase Loss." Brushless motors require three active electrical phases to generate a rotating magnetic field; if one phase drops, the motor stutters.
+> **If wired to a different UART port:** Substitute the correct port number (e.g., `SERIAL3_PROTOCOL`, `SERIAL3_BAUD` for UART3).
 
 ---
 
-### 48.1 The Solder Joint Inspection
+<a name="section-40"></a>
+## Section 40 — Overriding Persistent Radio & Throttle Failsafes
 
-A "cold" solder joint creates high resistance or intermittent contact.
+### If `Radio failsafe on` Persists After Radio Calibration
 
-1. Inspect the three heavy-gauge wires connecting the stuttering motor to the ESC.
-2. A good joint is shiny and smooth. A bad joint is dull, crystalline, or balled up.
-3. **Fix:** Re-flow all three solder joints on that specific motor pad using flux and a high-heat soldering iron.
+FlySky transmitters sometimes output a baseline PWM value slightly variable around `1000` when the throttle is at zero. If ArduPilot's threshold is too close to this value, minor fluctuations trigger the failsafe.
 
-### 48.2 The 8-Pin Wiring Harness (FC to ESC)
+In QGC Parameters:
+- Set `FS_THR_VALUE` to **`950`**, `925`, or even `900`
+- The failsafe will only trigger if PWM drops below this value — which only happens when the transmitter is physically powered off
 
-On stack-based flight controllers like the SpeedyBee F405 V4, motor signals travel from the top board (FC) to the bottom board (ESC) via a delicate 8-pin JST/ribbon cable.
-
-1. Unplug the cable from both the FC and the ESC.
-2. Inspect the interior of the white plastic connectors.
-3. **Fix:** If a single gold pin is bent, pushed backward, or corroded, the signal for that specific motor is dead. Straighten the pin or replace the entire cable harness.
-
-### 48.3 The Mounting Screw Short
-
-If the M3 screws used to mount the motor to the carbon fiber frame are too long, they will pierce the enamel coating of the copper stator windings inside the motor.
-
-1. This creates a hard electrical short to the carbon frame, instantly causing phase loss and stuttering.
-2. **Diagnostic Test:** Remove all four mounting screws. If the motor spins perfectly when unmounted, the screws are too long. Use shorter hardware or add washers.
-
-### 48.4 The Motor Swap Test (Isolating the Dead Component)
-
-To definitively prove whether the motor is burned out or the ESC MOSFET is destroyed:
-
-1. Desolder the three wires of the stuttering motor.
-2. Desolder a known-working motor from a different corner of the drone.
-3. Solder the suspect motor to the working ESC pads.
-* **If the suspect motor still stutters:** The motor's internal windings are burned or broken. Replace the motor.
-* **If the suspect motor now spins perfectly (and the working motor stutters on the old pads):** The ESC board has a blown MOSFET on that specific output. The ESC board must be replaced.
-
-
+Write parameters. The `Radio Failsafe Cleared` message should now persist.
 
 ---
 
-Documentation complete. No further chat sections provided.
+### If `Arm: Throttle too high` Appears After Failsafe Clears
+
+This error appears when ArduPilot does not know the precise zero-throttle position of your stick because Radio Calibration was not completed.
+
+1. Go to **QGC → Radio** tab.
+2. Click **Calibrate**.
+3. Move both sticks to all extreme corners.
+4. Click **Save/Apply**.
+
+This maps the exact zero-throttle PWM, eliminating the "throttle too high" error.
+
+---
+
+<a name="section-41"></a>
+## Section 41 — Configuring a Physical Arming Switch (Detailed)
+
+A dedicated physical arm/disarm switch is strongly recommended for safety. In an emergency, you can instantly cut motor power by flipping a single switch, rather than executing the stick command (throttle down + yaw right, held for 3 seconds).
+
+### Transmitter Setup
+
+1. Enter the FS-i6 menu (hold OK).
+2. Navigate to **Functions Setup → Aux. channels**.
+3. Set **Channel 6** to **SwD** (2-position switch).
+4. Save and Exit.
+
+### ArduPilot Parameter Setup
+
+In QGC Parameters:
+- Search **`RC6_OPTION`**
+- Set to **`153`** (ArmDisarm for ArduCopter V4.5+)
+- Write parameters and reboot
+
+> Older firmware: `RC6_OPTION = 41`. V4.5+ rejects `41` as invalid. Always use `153` on V4.5+.
+
+### Verifying Switch PWM Range
+
+1. QGC → **Radio** tab → flip SwD
+2. Channel 6 must move from ≈1000 to ≈2000
+3. If bar only moves halfway: FS-i6 → **Functions Setup → End Points** → Channel 6 → set both ends to `120%`
+
+---
+
+<a name="section-42"></a>
+## Section 42 — Resolving Motor Rotation Failures
+
+### Safety First
+
+**Remove all propellers before any motor testing.** A spinning motor without a propeller is relatively harmless; a spinning motor with a propeller can cause serious injury.
+
+---
+
+### Step 42.1 — QGC Motor Test (Software Bypass)
+
+This test commands motors directly, bypassing the radio and any radio/calibration errors:
+
+1. In QGC: **Vehicle Setup → Motors**.
+2. Slide the on-screen safety switch to enable motor testing.
+3. Click **Test Motor** for the failing motor.
+
+**Interpret the result:**
+
+| Motor Test Result | Meaning | Next Step |
+|------------------|---------|-----------|
+| Spins normally in test | Hardware is fine — software issue | Check ESC calibration or radio mixing |
+| Stutters or fails to spin | Physical hardware problem | Continue with hardware diagnostics below |
+
+---
+
+### Step 42.2 — Configure DShot (Recommended)
+
+Legacy PWM ESC control requires manual throttle range calibration that can desync over time. DShot is a fully digital protocol that is immune to this:
+
+In QGC Parameters:
+- Search **`MOT_PWM_TYPE`**
+- Set to **`4`** (DShot600)
+- Write parameters and reboot
+
+> **If `MOT_` parameters are missing:** See Section 45. The parameter name differs by firmware type. `SERVO_BLH_OTYPE` is the equivalent for some configurations. `Q_M_` prefix indicates QuadPlane firmware was accidentally flashed instead of ArduCopter.
+
+---
+
+<a name="section-43"></a>
+## Section 43 — Resolving "Logging Failed" Pre-Arm Errors
+
+### Why ArduPilot Requires Logging to Arm
+
+ArduPilot is configured by default to refuse arming if it cannot write flight telemetry to the SD card. This is a safety feature — post-crash analysis requires flight logs.
+
+---
+
+### Step 43.1 — SD Card Format Requirements
+
+The SpeedyBee F405 V4's SD card reader **cannot read exFAT partitions** and has strict format requirements:
+
+- Card size: **32GB or smaller**
+- Partition type: FAT32 (not exFAT, not NTFS, not ext4)
+- Cluster size: **32KB** (64 sectors × 512 bytes per sector)
+
+See Section 2 for complete formatting instructions.
+
+---
+
+### Step 43.2 — Slow SPI Bus Fix
+
+If a valid FAT32 card is inserted but logging still fails, the flight controller is attempting to write data faster than the SD card can respond:
+
+In QGC Parameters:
+- Search **`BRD_SD_SLOWDOWN`**
+- Increase from `0` to **`2`** or **`5`**
+- Write parameters and reboot
+
+Higher values reduce the SPI bus speed used to communicate with the SD card, accommodating slower cards.
+
+---
+
+### Step 43.3 — Bypass Logging for Bench Testing
+
+If the SD card reader is physically damaged or you do not need flight logs during bench testing:
+
+In QGC Parameters:
+1. Search **`LOG_BITMASK`** → set to **`0`** (disables all logging)
+2. Search **`ARMING_CHECK`** → click the dropdown and uncheck **Logging Available**
+
+> **Warning:** Only do this for bench testing. Re-enable logging before actual flight — logs are essential for diagnosing any in-flight issues or crashes.
+
+---
+
+<a name="section-44"></a>
+## Section 44 — Resolving Symmetrical Throttle Lag (Slow Motor Spin)
+
+### Symptom
+
+All four motors spin, but one or more accelerate noticeably slower than the others when throttle is increased. This is a calibration mismatch — the ESC does not know what signal represents "zero throttle" and "full throttle."
+
+---
+
+### Step 44.1 — ESC Calibration (PWM Protocol Only)
+
+If using standard PWM (not DShot), the ESCs must be calibrated to the throttle range:
+
+1. **Remove all propellers.**
+2. Go to **QGC → Vehicle Setup → Sensors → ESC Calibration** (may also appear under the **Power** tab).
+3. Follow the prompts exactly:
+   - Unplug the LiPo battery.
+   - Click **Start** in QGC.
+   - Plug in the LiPo battery.
+   - Wait for the ESC initialization tones (typically a series of beeps).
+   - Move the throttle stick to zero.
+4. The ESCs now know the full range from zero to maximum.
+
+> **Tip:** If using DShot (Section 42.2), ESC calibration is not needed — DShot communicates the exact commanded value digitally, eliminating range desynchronization entirely.
+
+---
+
+### Step 44.2 — Increase Minimum Idle Speed
+
+If a motor struggles to even begin rotating after arming (spins up very late or requires a significant throttle increase before moving), the minimum idle power is too low:
+
+In QGC Parameters:
+- Search **`MOT_SPIN_ARM`**
+- Increase incrementally from default `0.10` to `0.15`
+
+This parameter sets the minimum power percentage applied to all motors immediately upon arming, ensuring they overcome static friction and are ready to respond instantly.
+
+---
+
+<a name="section-45"></a>
+## Section 45 — Unhiding Advanced Parameters in QGC (Motor Context)
+
+### If Motor Parameters Are Not Visible
+
+QGC's default "Standard" view hides many ArduPilot parameters:
+
+1. Go to **Vehicle Setup → Parameters**.
+2. Change the dropdown from **Standard** to **Full Parameter List** (top-left corner, below the search bar).
+
+### Firmware-Specific Parameter Names
+
+If `MOT_` parameters still do not appear after switching to Full Parameter List:
+
+| Parameter to Search | Meaning |
+|--------------------|---------|
+| `SERVO_BLH_OTYPE` | Alternative DShot configuration parameter in some ArduPilot builds |
+| `Q_M_PWM_TYPE` | Motor PWM type if **QuadPlane firmware** was accidentally flashed |
+
+> **Identifying wrong firmware:** If all motor parameters use the `Q_M_` prefix instead of `MOT_`, QuadPlane firmware (designed for hybrid fixed-wing/multirotor aircraft) was flashed instead of ArduCopter. Reflash with the correct ArduCopter firmware for your specific SpeedyBee board version.
+
+---
+
+<a name="section-46"></a>
+## Section 46 — Diagnosing Asymmetrical Motor Stuttering (Phase Loss)
+
+### Symptom
+
+One motor twitches back and forth rapidly but fails to complete a full revolution. The other three motors spin normally.
+
+### What "Phase Loss" Means
+
+Brushless motors work by energizing three electrical coils (phases) in sequence to create a rotating magnetic field that spins the permanent magnet rotor. All three phases must be active simultaneously. If one phase is lost (open circuit, broken wire, bad solder joint, blown MOSFET), the motor jerks toward the two remaining phases but cannot complete a rotation — this appears as rapid twitching.
+
+**Phase loss is always a hardware failure.** It cannot be fixed by parameters, calibration, or firmware.
+
+---
+
+### Step 46.1 — Solder Joint Inspection
+
+1. Inspect the **three heavy-gauge wires** connecting the stuttering motor to the ESC pads.
+2. A **good joint** appears: shiny, smooth, convex, with clean wire entry.
+3. A **bad (cold) joint** appears: dull, grey, grainy/crystalline texture, or balled up.
+4. **Fix:** Reflow all three joints with a high-temperature soldering iron and flux. Flux cleans oxidation and helps solder flow correctly.
+
+---
+
+### Step 46.2 — 8-Pin FC-to-ESC Wiring Harness
+
+On the SpeedyBee stack, motor control signals travel from the flight controller (top board) to the ESC (bottom board) through a delicate 8-pin JST or ribbon cable connector.
+
+1. Unplug the 8-pin connector from **both** boards.
+2. Use a flashlight and inspect inside the white plastic connector housing.
+3. Look for:
+   - Gold pins that are bent or pushed backward into the housing
+   - Corrosion or green discoloration on pins
+   - A pin that is pushed further back than the others (lost contact)
+4. **Fix:** Carefully straighten bent pins with a fine needle. If a pin is corroded or damaged, replace the entire cable harness.
+
+---
+
+### Step 46.3 — Mounting Screw Short
+
+Motor mounting screws that are too long will pass through the motor's aluminum base and pierce the copper stator windings (the internal coils). This creates a short circuit between the winding and the motor body, causing phase loss.
+
+**Diagnostic test:**
+1. Remove all four mounting screws from the suspect motor.
+2. Hold the motor in place by hand and run the motor test (QGC → Motors).
+3. If the motor **spins perfectly when unmounted**, the screws are too long — use shorter M3 hardware or add nylon washers.
+
+---
+
+### Step 46.4 — Motor Swap Test (Definitive Isolation)
+
+To determine whether the motor itself is burned out or the ESC output is damaged:
+
+1. **Remove all propellers.**
+2. Desolder the three wires of the **suspect (stuttering) motor** from its ESC pads.
+3. Desolder a **known-good motor** from a different corner.
+4. Solder the **suspect motor** to the **working ESC pads**.
+5. Solder the **known-good motor** to the **suspect ESC pads**.
+6. Run the motor test on both.
+
+| Result | Conclusion | Action |
+|--------|-----------|--------|
+| Suspect motor still stutters on working ESC pads | Motor windings are burned/broken internally | Replace the motor |
+| Suspect motor now spins fine; good motor stutters on suspect pads | ESC has a blown MOSFET on that output | Replace the ESC board |
+
+---
+
+<a name="appendix"></a>
+## Appendix — Known Inconsistencies & Corrections Log
+
+This manual corrects all inconsistencies found across the original documentation versions. The following is a complete record of changes made and the reasoning behind each:
+
+| Issue Found | Original State | Correction Applied |
+|------------|---------------|-------------------|
+| UART port numbering | Some sections referenced UART4 (pads R4/T4); later sections used UART6 (T6/R6) | Standardized throughout to **UART6** (T6/R6 pads) — this is the port used in the physical build |
+| Power rule contradictions | Four different power rules appeared across versions: "USB permitted," then "USB prohibited," then "Double Power Rule," then "Single Power Rule" | Consolidated to the **Single Power Rule**: LiPo powers everything via UBEC; USB-C must be physically disconnected when UBEC is connected |
+| `disable-bt` typo | One version of `config.txt` instructions showed `disable-b` (missing the `t`) | Corrected to `disable-bt` throughout, with an explicit typo warning added |
+| `COMPASS_TYPEMASK` deprecated | Referenced for ArduPilot 4.5+ troubleshooting | Replaced with individual `COMPASS_USE2` through `COMPASS_USE8 = 0` toggles. `COMPASS_TYPEMASK` is deprecated in V4.5+. |
+| `RC6_OPTION` arm switch value | Listed as `41` (legacy value) | Corrected to `153` for ArduCopter V4.5+. V4.5+ rejects `41` with "Invalid channel option" error. |
+| `FS_THR_VALUE` inconsistency | Set to `975` in one section, `950` in another | Standardized to **`950`** as the functional tested value with adequate safety margin |
+| BZGNSS BZ-251 pinout | Missing from I2C wiring sections | Full 6-pin ribbon cable pinout table added to Section 21 |
+| Duplicate sections | Sections 33/41 (in-flight calibration), 34/38 (receiver wiring), and 42/43 (arm switch) were near-duplicates | Merged into single comprehensive sections with all details preserved |
+| MAVProxy dependency list incomplete | Only `mavproxy` was listed for pip install | Corrected to install `mavproxy future pyserial pymavlink` together — all required on Python 3.12+ |
+| `SERIAL6_OPTIONS` parameter | Not mentioned in wiring troubleshooting | Added to Section 16 — setting to `0` disables signal inversion and half-duplex modes that can cause silent hardware |
+| MAVProxy launch command | Used `/dev/serial0` in some sections, `/dev/ttyAMA0` in others | Standardized to `/dev/ttyAMA0` as the direct hardware alias. `/dev/serial0` used where it is confirmed to exist as a valid symlink. |
+| Accelerometer calibration prerequisite | Not clearly stated before compass calibration instructions | Section 29 now explicitly states: Accelerometer calibration must be completed before compass calibration can start. |
+
+---
+
+## Quick Reference — Common Parameters
+
+| Parameter | Purpose | Typical Value |
+|-----------|---------|--------------|
+| `SERIAL6_PROTOCOL` | MAVLink on UART6 | `2` |
+| `SERIAL6_BAUD` | Baud rate for UART6 | `921` (=921600) |
+| `SERIAL6_OPTIONS` | Signal options for UART6 | `0` |
+| `BRD_SER6_RTSCTS` | Hardware flow control UART6 | `0` |
+| `BARO_PROBE_EXT` | External barometer probing | `0` |
+| `BARO_PRIMARY` | Primary barometer selection | `0` |
+| `BRD_IO_ENABLE` | Secondary I/O co-processor | `0` |
+| `COMPASS_ENABLE` | Enable compass subsystem | `1` |
+| `COMPASS_AUTO_ROT` | Auto-detect compass orientation | `1` |
+| `COMPASS_USE` | Use Compass 1 (GPS puck) | `1` |
+| `COMPASS_USE2`–`COMPASS_USE8` | Ghost compasses disabled | `0` |
+| `COMPASS_LEARN` | In-flight calibration mode | `0` (normal); `3` (in-flight learn) |
+| `COMPASS_CAL_FIT` | Calibration strictness | `16` (default); `32`–`48` (noisy environment) |
+| `FS_THR_VALUE` | Throttle failsafe threshold | `950` |
+| `SERIAL2_PROTOCOL` | Protocol for UART2 (RC input) | `23` (RCIN) |
+| `SERIAL2_BAUD` | Baud rate for UART2 (RC input) | `115` (=115200) |
+| `RC6_OPTION` | Function for Channel 6 switch | `153` (ArmDisarm, V4.5+) |
+| `MOT_PWM_TYPE` | ESC protocol | `4` (DShot600) |
+| `MOT_SPIN_ARM` | Minimum idle power on arm | `0.10`–`0.15` |
+| `BRD_SD_SLOWDOWN` | SD card write speed reduction | `0` (fast card); `2`–`5` (slow card) |
+| `LOG_BITMASK` | Logging channels bitmask | `0` (disabled, bench only) |
+
+---
+
+*End of complete documentation. All sections from both source documents have been merged, inconsistencies resolved, and information presented for readers with no prior context on the topic.*
