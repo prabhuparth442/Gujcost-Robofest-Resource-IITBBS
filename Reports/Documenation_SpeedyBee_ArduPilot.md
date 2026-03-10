@@ -1,7 +1,7 @@
 # SpeedyBee ArduPilot: Complete Setup & Troubleshooting Manual
 *Comprehensive Reference — All Sections, All Details, No Redundancy*   
-*Original Data : 
-![Source Data](https://docs.google.com/document/d/1z3HKV97rB1eR1Wk653h4rTs9prCnCsXNmgBnI1QO64Q/edit?usp=sharing)
+*Original Data :* 
+[Source Data](https://docs.google.com/document/d/1z3HKV97rB1eR1Wk653h4rTs9prCnCsXNmgBnI1QO64Q/edit?usp=sharing)
 
 ---
 
