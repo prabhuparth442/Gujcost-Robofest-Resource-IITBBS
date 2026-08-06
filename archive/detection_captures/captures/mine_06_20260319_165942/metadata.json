@@ -1,0 +1,10 @@
+{
+  "label": "mine_06",
+  "sample_type": "mine",
+  "timestamp": "20260319_165942",
+  "n_frames": 48,
+  "drone_height_m": 1.5,
+  "T_background_C": 39.69076156616211,
+  "dT_max_C": 3.4019508361816406,
+  "dT_min_C": -4.273723602294922
+}

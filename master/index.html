@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>S.A.F.E. Field Map</title>
+<style>
+:root{--bg:#0f1117;--bg2:#1a1d27;--bg3:#22263a;--border:rgba(255,255,255,0.08);--text:#e8e6f0;--muted:#7c7a8a;--accent:#4f8ef7;--green:#2dd4a0;--amber:#f5a623;--red:#f05a5a;--purple:#9b7ff5}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'SF Mono','Fira Code',monospace;font-size:13px;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:16px}
+h1{font-size:15px;font-weight:600;letter-spacing:.12em;color:var(--accent);text-transform:uppercase;margin-bottom:4px}
+.sub{color:var(--muted);font-size:11px;margin-bottom:16px;letter-spacing:.06em}
+.layout{display:flex;gap:16px;width:100%;max-width:960px;align-items:flex-start}
+.map-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:12px;flex:1;min-width:0}
+canvas{display:block;width:100%;border-radius:6px;cursor:crosshair}
+.panel{width:220px;flex-shrink:0;display:flex;flex-direction:column;gap:10px}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:12px 14px}
+.ct{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+.lr{display:flex;align-items:center;gap:8px;margin-bottom:7px;font-size:11px;color:var(--text)}
+.sw{width:14px;height:14px;border-radius:3px;flex-shrink:0}
+.sw.c{border-radius:50%}
+.ir{display:flex;justify-content:space-between;font-size:11px;padding:4px 0;border-bottom:1px solid var(--border);color:var(--muted)}
+.ir:last-child{border-bottom:none}
+.ir span:last-child{color:var(--text)}
+.hi{min-height:52px;font-size:11px;color:var(--muted);padding-top:4px;line-height:1.6}
+.hi strong{color:var(--text)}
+.tr{display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--text);padding:3px 0}
+.tg{width:30px;height:16px;border-radius:8px;background:var(--bg3);border:1px solid var(--border);cursor:pointer;position:relative;transition:background .2s}
+.tg.on{background:var(--accent)}
+.tg::after{content:'';position:absolute;width:12px;height:12px;border-radius:50%;background:white;top:1px;left:1px;transition:transform .2s}
+.tg.on::after{transform:translateX(14px)}
+@media(max-width:640px){.layout{flex-direction:column}.panel{width:100%}}
+</style>
+</head>
+<body>
+<h1>S.A.F.E. Competition Field Map</h1>
+<p class="sub">Ahmedabad · 23.0779530°N 72.4953475°E · Origin = Start · South = −Y axis</p>
+<div class="layout">
+  <div class="map-wrap"><canvas id="map" width="580" height="680"></canvas></div>
+  <div class="panel">
+    <div class="card">
+      <div class="ct">Legend</div>
+      <div class="lr"><div class="sw c" style="background:#f05a5a;opacity:.4;border:2px solid #f05a5a"></div>Forbidden zone</div>
+      <div class="lr"><div class="sw c" style="background:#f5a623;opacity:.35;border:2px solid #f5a623"></div>Mine avoidance disc</div>
+      <div class="lr"><div class="sw" style="background:#4f8ef7;opacity:.2;border:1px solid #4f8ef7"></div>Scan lane band</div>
+      <div class="lr"><div class="sw" style="background:#2dd4a0;opacity:.2;border:1px solid #2dd4a0"></div>Coverage (simulated)</div>
+      <div class="lr"><div class="sw c" style="background:#f5a623;width:10px;height:10px"></div>Buried mine (GPS known)</div>
+      <div class="lr"><div class="sw c" style="background:#f05a5a;width:10px;height:10px"></div>Pole / Statue</div>
+      <div class="lr"><div class="sw c" style="background:#9b7ff5;width:10px;height:10px"></div>Start point</div>
+      <div class="lr"><div class="sw" style="background:#c8a86e;height:5px;border-radius:3px"></div>Paved path (pink in image)</div>
+    </div>
+    <div class="card">
+      <div class="ct">Field objects</div>
+      <div class="ir"><span>Start</span><span>0.0, 0.0 m</span></div>
+      <div class="ir"><span>Mine 1</span><span>+7.9, −3.6 m</span></div>
+      <div class="ir"><span>Mine 2</span><span>+6.8, −8.7 m</span></div>
+      <div class="ir"><span>Mine 3</span><span>+14.2, −5.4 m</span></div>
+      <div class="ir"><span>Mine 4</span><span>+18.9, −12.0 m</span></div>
+      <div class="ir"><span>Mine 5</span><span>+18.7, −19.2 m</span></div>
+      <div class="ir"><span>Pole</span><span>+13.2, −7.6 m</span></div>
+      <div class="ir"><span>Statue</span><span>+26.5, −14.5 m</span></div>
+      <div class="ir"><span>End</span><span>+28.4, −19.2 m</span></div>
+    </div>
+    <div class="card">
+      <div class="ct">Layers</div>
+      <div class="tr">Scan lanes <div class="tg on" id="t-lanes" onclick="tog('lanes',this)"></div></div>
+      <div class="tr">Mine discs <div class="tg on" id="t-mines" onclick="tog('mines',this)"></div></div>
+      <div class="tr">Forbidden zones <div class="tg on" id="t-forbidden" onclick="tog('forbidden',this)"></div></div>
+      <div class="tr">Coverage grid <div class="tg on" id="t-grid" onclick="tog('grid',this)"></div></div>
+      <div class="tr">Paved path <div class="tg on" id="t-path" onclick="tog('path',this)"></div></div>
+      <div class="tr">Labels <div class="tg on" id="t-labels" onclick="tog('labels',this)"></div></div>
+    </div>
+    <div class="card">
+      <div class="ct">Hover info</div>
+      <div class="hi" id="hi">Move cursor over map</div>
+    </div>
+  </div>
+</div>
+<script>
+const canvas=document.getElementById('map'),ctx=canvas.getContext('2d');
+const W=canvas.width,H=canvas.height,PAD=38;
+const FX=[-3,32],FY=[-23,3];
+function tc(x,y){return[PAD+(x-FX[0])/(FX[1]-FX[0])*(W-2*PAD),H-PAD-(y-FY[0])/(FY[1]-FY[0])*(H-2*PAD)];}
+function fc(cx,cy){return[(cx-PAD)/(W-2*PAD)*(FX[1]-FX[0])+FX[0],(H-PAD-cy)/(H-2*PAD)*(FY[1]-FY[0])+FY[0]];}
+function mpx(m){return m/(FX[1]-FX[0])*(W-2*PAD);}
+function mpy(m){return m/(FY[1]-FY[0])*(H-2*PAD);}
+
+const MINES=[{n:'Mine 1',x:7.90,y:-3.64},{n:'Mine 2',x:6.80,y:-8.73},{n:'Mine 3',x:14.21,y:-5.35},{n:'Mine 4',x:18.89,y:-12.02},{n:'Mine 5',x:18.68,y:-19.23}];
+const FZS=[{n:'Pole',x:13.19,y:-7.56,r:1.5},{n:'Statue',x:26.51,y:-14.49,r:2.5}];
+const PASSES=[{x1:5.0-0.78,x2:7.8+0.78,l:'Pass 1'},{x1:9.2-0.78,x2:11.2+0.78,l:'Pass 2'},{x1:15.2-0.78,x2:18.0+0.78,l:'Pass 3'},{x1:19.4-0.78,x2:22.0+0.78,l:'Pass 4'}];
+const SY0=-1,SY1=-22;
+const PATH_PTS=[[15,3],[14.5,1],[14,-1],[13.7,-3],[13.8,-5],[14.2,-7],[13.8,-9],[13,-11],[12.5,-13],[13,-15],[13.8,-17],[14.2,-19],[13.8,-21],[13,-22]];
+
+const L={lanes:true,mines:true,forbidden:true,grid:true,path:true,labels:true};
+function tog(k,el){L[k]=!L[k];el.classList.toggle('on',L[k]);draw();}
+
+function circ(x,y,rx,ry,fill,stroke){
+  const[cx,cy]=tc(x,y);
+  ctx.beginPath();ctx.ellipse(cx,cy,mpx(rx),mpy(ry),0,0,Math.PI*2);
+  if(fill){ctx.fillStyle=fill;ctx.fill();}
+  if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=1;ctx.stroke();}
+}
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#13161f';ctx.fillRect(0,0,W,H);
+
+  ctx.strokeStyle='rgba(255,255,255,0.04)';ctx.lineWidth=0.5;
+  for(let i=0;i<=5;i++){
+    const gx=PAD+i*(W-2*PAD)/5;ctx.beginPath();ctx.moveTo(gx,PAD);ctx.lineTo(gx,H-PAD);ctx.stroke();
+    const gy=PAD+i*(H-2*PAD)/5;ctx.beginPath();ctx.moveTo(PAD,gy);ctx.lineTo(W-PAD,gy);ctx.stroke();
+  }
+  ctx.strokeStyle='rgba(255,255,255,0.18)';ctx.lineWidth=1;
+  ctx.strokeRect(PAD,PAD,W-2*PAD,H-2*PAD);
+
+  ctx.fillStyle='rgba(255,255,255,0.3)';ctx.font='9px SF Mono,monospace';
+  ctx.textAlign='center';
+  [-3,0,5,10,15,20,25,30].forEach(v=>{const[cx]=tc(v,0);ctx.fillText(v+'m',cx,H-PAD+13);});
+  ctx.textAlign='right';
+  [-5,-10,-15,-20].forEach(v=>{const[,cy]=tc(0,v);ctx.fillText(v+'m',PAD-4,cy+3);});
+
+  if(L.path){
+    ctx.beginPath();
+    PATH_PTS.forEach(([x,y],i)=>{const[cx,cy]=tc(x,y);i===0?ctx.moveTo(cx,cy):ctx.lineTo(cx,cy);});
+    ctx.strokeStyle='#c8a86e';ctx.lineWidth=mpx(2.0);ctx.lineCap='round';ctx.lineJoin='round';
+    ctx.globalAlpha=0.18;ctx.stroke();
+    ctx.globalAlpha=1;ctx.lineCap='butt';
+    ctx.beginPath();
+    PATH_PTS.forEach(([x,y],i)=>{const[cx,cy]=tc(x,y);i===0?ctx.moveTo(cx,cy):ctx.lineTo(cx,cy);});
+    ctx.strokeStyle='#ffe4b0';ctx.lineWidth=mpx(1.0);
+    ctx.globalAlpha=0.1;ctx.stroke();ctx.globalAlpha=1;
+    if(L.labels){const[px,py]=tc(14,-10);ctx.fillStyle='rgba(200,168,110,0.7)';ctx.font='9px SF Mono,monospace';ctx.textAlign='left';ctx.fillText('path (FP risk: edges)',px+8,py);}
+  }
+
+  if(L.grid){
+    const cs=0.5;
+    for(let px=FX[0];px<=FX[1];px+=cs){
+      for(let py=FY[0];py<=FY[1];py+=cs){
+        const inPass=PASSES.some(p=>px>=p.x1&&px<=p.x2);
+        const inScan=py>=SY1&&py<=SY0;
+        if(!inPass||!inScan)continue;
+        const[cx,cy]=tc(px,py);
+        const cw=mpx(cs)-0.5,ch=mpy(cs)-0.5;
+        ctx.fillStyle='rgba(45,212,160,0.09)';
+        ctx.fillRect(cx,cy,cw,-ch);
+      }
+    }
+  }
+
+  if(L.lanes){
+    PASSES.forEach((p,i)=>{
+      const[x1c,y1c]=tc(p.x1,SY0),[x2c,y2c]=tc(p.x2,SY1);
+      ctx.fillStyle=`rgba(79,142,247,${0.08+i*0.03})`;
+      ctx.strokeStyle='rgba(79,142,247,0.25)';ctx.lineWidth=0.5;
+      ctx.fillRect(x1c,y2c,x2c-x1c,y1c-y2c);
+      ctx.strokeRect(x1c,y2c,x2c-x1c,y1c-y2c);
+      if(L.labels){
+        ctx.fillStyle='rgba(79,142,247,0.65)';ctx.font='9px SF Mono,monospace';
+        ctx.textAlign='center';ctx.fillText(p.l,(x1c+x2c)/2,y2c-4);
+      }
+    });
+    const[,sy0]=tc(0,SY0),[,sy1]=tc(0,SY1);
+    [[5.0,'S1'],[6.4,'S2'],[7.8,'S3']].forEach(([lx,label])=>{
+      const[cx]=tc(lx,0);
+      ctx.strokeStyle='rgba(79,142,247,0.45)';ctx.lineWidth=1;ctx.setLineDash([3,3]);
+      ctx.beginPath();ctx.moveTo(cx,sy0);ctx.lineTo(cx,sy1);ctx.stroke();ctx.setLineDash([]);
+      if(L.labels){ctx.fillStyle='rgba(79,142,247,0.8)';ctx.font='9px SF Mono,monospace';ctx.textAlign='center';ctx.fillText(label,cx,sy0+11);}
+    });
+  }
+
+  if(L.mines) MINES.forEach(m=>circ(m.x,m.y,0.75,0.75,'rgba(245,166,35,0.14)','rgba(245,166,35,0.65)'));
+  if(L.forbidden) FZS.forEach(fz=>circ(fz.x,fz.y,fz.r,fz.r,'rgba(240,90,90,0.13)','rgba(240,90,90,0.75)'));
+
+  const[ox,oy]=tc(0,0);
+  ctx.beginPath();ctx.arc(ox,oy,7,0,Math.PI*2);
+  ctx.fillStyle='#9b7ff5';ctx.fill();
+  ctx.strokeStyle='#6a4fd8';ctx.lineWidth=1.5;ctx.stroke();
+  if(L.labels){ctx.fillStyle='#9b7ff5';ctx.font='10px SF Mono,monospace';ctx.textAlign='left';ctx.fillText('START',ox+10,oy+4);}
+
+  MINES.forEach(m=>{
+    const[cx,cy]=tc(m.x,m.y);
+    ctx.beginPath();ctx.arc(cx,cy,4,0,Math.PI*2);
+    ctx.fillStyle='#f5a623';ctx.fill();
+    ctx.strokeStyle='#c47e00';ctx.lineWidth=1;ctx.stroke();
+    if(L.labels){ctx.fillStyle='#f5a623';ctx.font='9px SF Mono,monospace';ctx.textAlign='left';ctx.fillText(m.n.replace('Mine ','M'),cx+6,cy+3);}
+  });
+
+  FZS.forEach(fz=>{
+    const[cx,cy]=tc(fz.x,fz.y);
+    ctx.beginPath();ctx.arc(cx,cy,5,0,Math.PI*2);
+    ctx.fillStyle='#f05a5a';ctx.fill();
+    ctx.strokeStyle='#b02020';ctx.lineWidth=1;ctx.stroke();
+    if(L.labels){ctx.fillStyle='#f05a5a';ctx.font='10px SF Mono,monospace';ctx.textAlign='left';ctx.fillText(fz.n,cx+8,cy+4);}
+  });
+
+  const[ex,ey]=tc(28.43,-19.16);
+  ctx.beginPath();ctx.arc(ex,ey,5,0,Math.PI*2);
+  ctx.fillStyle='#7c7a8a';ctx.fill();
+  if(L.labels){ctx.fillStyle='#7c7a8a';ctx.font='9px SF Mono,monospace';ctx.textAlign='left';ctx.fillText('END',ex+7,ey+3);}
+
+  if(L.labels){
+    ctx.fillStyle='rgba(255,255,255,0.2)';ctx.font='9px SF Mono,monospace';
+    ctx.textAlign='left';ctx.fillText('+X → East',PAD+4,H-PAD-5);
+  }
+}
+draw();
+
+const hi=document.getElementById('hi');
+canvas.addEventListener('mousemove',e=>{
+  const r=canvas.getBoundingClientRect();
+  const sx=canvas.width/r.width,sy=canvas.height/r.height;
+  const[fx,fy]=fc((e.clientX-r.left)*sx,(e.clientY-r.top)*sy);
+  let s=`<strong>x=${fx.toFixed(1)}m, y=${fy.toFixed(1)}m</strong><br>`;
+  const nm=MINES.find(m=>Math.hypot(m.x-fx,m.y-fy)<0.75+0.3);
+  if(nm)s+=`<span style="color:#f5a623">${nm.n} hazard disc</span><br>`;
+  const nf=FZS.find(fz=>Math.hypot(fz.x-fx,fz.y-fy)<fz.r+0.3);
+  if(nf)s+=`<span style="color:#f05a5a">${nf.n} — FORBIDDEN no-fly</span><br>`;
+  const il=PASSES.find(p=>fx>=p.x1&&fx<=p.x2&&fy<=SY0&&fy>=SY1);
+  if(il)s+=`In ${il.l}<br>`;
+  if(fx<-1)s+=`<span style="color:#f5a623">Grass exclusion (x &lt; −1m)</span><br>`;
+  hi.innerHTML=s;
+});
+canvas.addEventListener('mouseleave',()=>{hi.innerHTML='Move cursor over map';});
+</script>
+</body>
+</html>

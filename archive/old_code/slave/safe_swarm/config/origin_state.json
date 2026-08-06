@@ -1,0 +1,10 @@
+{
+    "local_origin_x": 0.0,
+    "local_origin_y": 0.0,
+    "locked_yaw_rad": 1.5708,
+    "locked_yaw_deg": 90.0,
+    "start_lat": 20.296,
+    "start_lon": 85.824,
+    "flight_altitude_m": 1.5,
+    "status": "LOCKED"
+}

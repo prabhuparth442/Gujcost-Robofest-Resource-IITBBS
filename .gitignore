@@ -1,0 +1,157 @@
+# ============================================================
+#  Gujcost Robofest — .gitignore
+#  Covers: Python, C++, ROS2, Raspberry Pi, calibration data
+# ============================================================
+
+# ─── Python ──────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+pip-wheel-metadata/
+*.manifest
+
+# Virtual environments
+env/
+venv/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+thermal_env/         # large venv inside Backup/ — never commit
+
+# ─── C++ Compiled Binaries ───────────────────────────────────
+slave/bin/mlx_stdout
+slave/bin/
+master/bin/
+*.o
+*.a
+*.so
+*.out
+*.elf
+*.hex
+
+# BCM2835 / MLX build artifacts
+*.lo
+*.la
+Makefile.in
+aclocal.m4
+autom4te.cache/
+config.log
+config.status
+configure
+stamp-h1
+
+# ─── Calibration & Runtime State (machine-specific) ──────────
+# These files are generated per-drone — never commit them
+slave/config/origin_state.json
+slave/config/fpn_pattern.npy
+master/config/origin_state.json
+
+# TLS certificates (self-signed, generated per-machine)
+master/*.pem
+master/cert.pem
+master/key.pem
+*.pem
+*.key
+*.crt
+*.csr
+
+# ─── Runtime logs & mission outputs ──────────────────────────
+*.log
+logs/
+virtual_map.json
+mine_report_*.json
+flight_log_*.json
+
+# ─── Test data & captures (large binary files) ───────────────
+# Keep the directory structure but not the actual numpy arrays
+# (they can be hundreds of MB)
+slave/test_data/captures/*/raw_stack.npy
+slave/test_data/captures/*/corrected.npy
+slave/test_data/dataset_32hz.npy
+slave/test_data/thermal_dataset.npy
+*.npy
+*.npz
+
+# Allow the FPN pattern that ships with the repo
+!slave/config/fpn_pattern.npy
+
+# ─── Vosk speech model ───────────────────────────────────────
+# Too large to commit — download instructions in master/README.md
+master/vosk_model/
+vosk-model-*/
+
+# ─── ROS2 build artifacts (if migrating) ─────────────────────
+install/
+build/
+log/
+.colcon_install_layout
+.cmake/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+_deps/
+ament_cmake_core/
+COLCON_IGNORE
+
+# ─── IDE & editor files ──────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+.env
+.env.local
+
+# ─── Jupyter notebooks (outputs) ─────────────────────────────
+.ipynb_checkpoints
+*.ipynb
+
+# ─── Large archive files ─────────────────────────────────────
+# These tarballs/zips are kept locally but not pushed to git
+*.tar.gz
+*.zip
+*.tar.bz2
+*.7z
+FOLDER.zip
+Backup.tar.gz
+Samples.zip
+captured_data.tar.gz
+drone_swarm_folder.tar.gz
+salve_Drone_codes.tar.gz
+
+# ─── Push script internals ───────────────────────────────────
+.push_state.json     # tracks which batches have been pushed (machine-local)
+logs/                # push script log output
+
+# ─── OS generated ────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini

@@ -1,0 +1,248 @@
+{
+  "_note": "Repo already has 93 commits. Days start from next push. Paths relative to repo root.",
+  "_status": "Run: python3 scripts/daily_push.py --status",
+  "days": [
+    {
+      "day": 1,
+      "label": "Slave orchestrator + grid map",
+      "files": [
+        "slave/main_orchestrator.py",
+        "slave/grid_map.py",
+        "slave/swarm_state.py",
+        "slave/requirements.txt"
+      ],
+      "message": "Add slave orchestrator and grid map core"
+    },
+    {
+      "day": 2,
+      "label": "Thermal detection filters",
+      "files": [
+        "slave/02_vision_filter.py",
+        "slave/06_surface_filter.py",
+        "slave/03_persistence.py"
+      ],
+      "message": "Add thermal detection: buried mines + surface discs + persistence"
+    },
+    {
+      "day": 3,
+      "label": "Coordinate math + map verifier",
+      "files": [
+        "slave/04_coordinate_math.py",
+        "slave/05_map_verifier.py",
+        "slave/fieldmap.py"
+      ],
+      "message": "Add coordinate system and A* field map"
+    },
+    {
+      "day": 4,
+      "label": "Comms stack (slave)",
+      "files": [
+        "slave/tcp_channel.py",
+        "slave/udp_channel.py",
+        "slave/tf_luna_failsafe.py",
+        "slave/08_comms_link.py"
+      ],
+      "message": "Add slave comms: TCP/UDP channels and TF-Luna LIDAR failsafe"
+    },
+    {
+      "day": 5,
+      "label": "Slave config + preflight",
+      "files": [
+        "slave/config/",
+        "slave/00_preflight_calib.py",
+        "slave/README.md",
+        "slave/SETUP.md"
+      ],
+      "message": "Add slave config and preflight calibration"
+    },
+    {
+      "day": 6,
+      "label": "C++ thermal driver",
+      "files": [
+        "slave/src/",
+        "tools/mlx_stdout.cpp"
+      ],
+      "message": "Add C++ MLX90640 driver with BCM2835 I2C"
+    },
+    {
+      "day": 7,
+      "label": "Competition orchestrator + tests",
+      "files": [
+        "slave/main_orchestrator_competition.py",
+        "slave/test_suite.py",
+        "slave/test_mission.py",
+        "slave/test_data/"
+      ],
+      "message": "Add competition orchestrator and test suite"
+    },
+    {
+      "day": 8,
+      "label": "Master Flask + swarm state",
+      "files": [
+        "master/app.py",
+        "master/swarm_state.py",
+        "master/grid_map.py",
+        "master/fieldmap.py",
+        "master/requirements.txt"
+      ],
+      "message": "Add master controller: Flask HTTPS + swarm state aggregator"
+    },
+    {
+      "day": 9,
+      "label": "Master comms + config",
+      "files": [
+        "master/tcp_channel.py",
+        "master/tcp_commander.py",
+        "master/udp_channel.py",
+        "master/udp_telementry.py",
+        "master/config/",
+        "master/README.md",
+        "master/SETUP.md"
+      ],
+      "message": "Add master comms stack and swarm configuration"
+    },
+    {
+      "day": 10,
+      "label": "Launch script + PS PDF",
+      "files": [
+        "launch.py",
+        "Drone_Robofest_PS.pdf",
+        ".gitignore"
+      ],
+      "message": "Add quick-start launcher, problem statement PDF, gitignore"
+    },
+    {
+      "day": 11,
+      "label": "PC debug tools",
+      "files": [
+        "tools/pc_thermal_viewer.py",
+        "tools/pc_binary_viewer.py",
+        "tools/pc_viewer.py",
+        "tools/pc_sector_viewer.py",
+        "tools/raw_listener.py",
+        "tools/README.md"
+      ],
+      "message": "Add PC-side debug and thermal visualisation tools"
+    },
+    {
+      "day": 12,
+      "label": "Hardware guide",
+      "files": [
+        "hardware/README.md"
+      ],
+      "message": "Add hardware wiring and setup guide"
+    },
+    {
+      "day": 13,
+      "label": "Architecture + competition docs",
+      "files": [
+        "docs/architecture.md",
+        "docs/competition_brief.md",
+        "docs/field_layout.md"
+      ],
+      "message": "Add architecture and competition documentation"
+    },
+    {
+      "day": 14,
+      "label": "Getting started guide",
+      "files": [
+        "docs/getting_started.md"
+      ],
+      "message": "Add newcomer getting-started guide with SITL walkthrough"
+    },
+    {
+      "day": 15,
+      "label": "Concepts deep-dives",
+      "files": [
+        "docs/concepts.md"
+      ],
+      "message": "Add concepts doc: thermal physics, A*, grid bitmask, TCP framing"
+    },
+    {
+      "day": 16,
+      "label": "Historical reports",
+      "files": [
+        "docs/reports/"
+      ],
+      "message": "Add historical SOPs and technical reports"
+    },
+    {
+      "day": 17,
+      "label": "Research: thermal + navigation",
+      "files": [
+        "research/README.md",
+        "research/01_thermal_mine_detection.md",
+        "research/02_gps_denied_navigation.md"
+      ],
+      "message": "Add research summaries: thermal detection and GPS-denied navigation"
+    },
+    {
+      "day": 18,
+      "label": "Research: swarm + path planning",
+      "files": [
+        "research/03_swarm_coordination.md",
+        "research/04_path_planning.md"
+      ],
+      "message": "Add research summaries: swarm coordination and path planning"
+    },
+    {
+      "day": 19,
+      "label": "Research: sensors + implementation",
+      "files": [
+        "research/05_sensor_hardware.md",
+        "research/06_implementation_references.md"
+      ],
+      "message": "Add research summaries: sensor hardware and implementation references"
+    },
+    {
+      "day": 20,
+      "label": "Research papers (PDFs)",
+      "files": [
+        "research/papers/"
+      ],
+      "message": "Add reference PDFs: D* Lite, probabilistic robotics, swarm robotics, demining"
+    },
+    {
+      "day": 21,
+      "label": "ROS2 concepts + MAVSDK comparison",
+      "files": [
+        "migration/README.md",
+        "migration/01_ros2_concepts.md",
+        "migration/02_mavsdk_to_ros2.md"
+      ],
+      "message": "Add migration guide: ROS2 concepts and MAVSDK comparison"
+    },
+    {
+      "day": 22,
+      "label": "PX4 uXRCE-DDS bridge",
+      "files": [
+        "migration/03_px4_ros2_bridge.md"
+      ],
+      "message": "Add PX4 ROS2 bridge setup with uXRCE-DDS"
+    },
+    {
+      "day": 23,
+      "label": "Swarm in ROS2",
+      "files": [
+        "migration/04_swarm_in_ros2.md"
+      ],
+      "message": "Add swarm architecture in ROS2: namespaces, custom messages, launch files"
+    },
+    {
+      "day": 24,
+      "label": "Migration plan",
+      "files": [
+        "migration/05_migration_plan.md"
+      ],
+      "message": "Add 7-phase MAVSDK to ROS2 migration plan (6-8 week estimate)"
+    },
+    {
+      "day": 25,
+      "label": "Simulation + archive cleanup",
+      "files": [
+        "Simulation/"
+      ],
+      "message": "Add simulation iterations: Gazebo single-drone and enhanced thermal field"
+    }
+  ]
+}
