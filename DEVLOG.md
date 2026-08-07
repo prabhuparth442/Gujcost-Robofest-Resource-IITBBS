@@ -6,3 +6,8 @@ Daily progress notes pushed incrementally to keep the repo active.
 **Master comms + config**
 
 Add master comms stack and swarm configuration
+
+## Day 10 — 2026-08-07
+**Launch script + PS PDF**
+
+Add quick-start launcher, problem statement PDF, gitignore
