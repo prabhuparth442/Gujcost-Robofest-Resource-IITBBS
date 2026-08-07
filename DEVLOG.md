@@ -26,3 +26,8 @@ Add thermal detection: buried mines + surface discs + persistence
 **Coordinate math + map verifier**
 
 Add coordinate system and A* field map
+
+## Day 4 — 2026-08-07
+**Comms stack (slave)**
+
+Add slave comms: TCP/UDP channels and TF-Luna LIDAR failsafe
