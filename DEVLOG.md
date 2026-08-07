@@ -46,3 +46,8 @@ Add C++ MLX90640 driver with BCM2835 I2C
 **Competition orchestrator + tests**
 
 Add competition orchestrator and test suite
+
+## Day 8 — 2026-08-07
+**Master Flask + swarm state**
+
+Add master controller: Flask HTTPS + swarm state aggregator
