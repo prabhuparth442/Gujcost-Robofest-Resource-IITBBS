@@ -31,3 +31,8 @@ Add coordinate system and A* field map
 **Comms stack (slave)**
 
 Add slave comms: TCP/UDP channels and TF-Luna LIDAR failsafe
+
+## Day 5 — 2026-08-07
+**Slave config + preflight**
+
+Add slave config and preflight calibration
