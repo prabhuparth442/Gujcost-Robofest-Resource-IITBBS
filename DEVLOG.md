@@ -41,3 +41,8 @@ Add slave config and preflight calibration
 **C++ thermal driver**
 
 Add C++ MLX90640 driver with BCM2835 I2C
+
+## Day 7 — 2026-08-07
+**Competition orchestrator + tests**
+
+Add competition orchestrator and test suite
