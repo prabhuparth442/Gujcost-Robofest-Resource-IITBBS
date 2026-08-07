@@ -21,3 +21,8 @@ Add slave orchestrator and grid map core
 **Thermal detection filters**
 
 Add thermal detection: buried mines + surface discs + persistence
+
+## Day 3 — 2026-08-07
+**Coordinate math + map verifier**
+
+Add coordinate system and A* field map
