@@ -36,3 +36,8 @@ Add slave comms: TCP/UDP channels and TF-Luna LIDAR failsafe
 **Slave config + preflight**
 
 Add slave config and preflight calibration
+
+## Day 6 — 2026-08-07
+**C++ thermal driver**
+
+Add C++ MLX90640 driver with BCM2835 I2C
