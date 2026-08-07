@@ -16,3 +16,8 @@ Add quick-start launcher, problem statement PDF, gitignore
 **Slave orchestrator + grid map**
 
 Add slave orchestrator and grid map core
+
+## Day 2 — 2026-08-07
+**Thermal detection filters**
+
+Add thermal detection: buried mines + surface discs + persistence
