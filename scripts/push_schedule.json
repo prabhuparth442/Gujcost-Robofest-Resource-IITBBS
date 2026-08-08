@@ -204,21 +204,21 @@
     },
     {
       "day": 21,
-      "label": "ROS2 concepts + MAVSDK comparison",
+      "label": "ROS2 concepts + ArduPilot comparison",
       "files": [
         "migration/README.md",
         "migration/01_ros2_concepts.md",
         "migration/02_mavsdk_to_ros2.md"
       ],
-      "message": "Add migration guide: ROS2 concepts and MAVSDK comparison"
+      "message": "Add migration guide: ROS2 concepts and ArduPilot/pymavlink comparison"
     },
     {
       "day": 22,
-      "label": "PX4 uXRCE-DDS bridge",
+      "label": "ArduPilot AP_DDS bridge for ROS2",
       "files": [
-        "migration/03_px4_ros2_bridge.md"
+        "migration/03_ardupilot_ros2_bridge.md"
       ],
-      "message": "Add PX4 ROS2 bridge setup with uXRCE-DDS"
+      "message": "Add ArduPilot ROS2 bridge setup with AP_DDS"
     },
     {
       "day": 23,
@@ -234,7 +234,7 @@
       "files": [
         "migration/05_migration_plan.md"
       ],
-      "message": "Add 7-phase MAVSDK to ROS2 migration plan (6-8 week estimate)"
+      "message": "Add 7-phase ArduPilot to ROS2 migration plan (6-8 week estimate)"
     },
     {
       "day": 25,

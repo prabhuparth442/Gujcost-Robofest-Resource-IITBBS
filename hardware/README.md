@@ -105,7 +105,7 @@ export LUNA_PORT=/dev/ttyUSB0
 
 ## 4. Flight Controller + MAVSDK
 
-**What it does:** The flight controller (FC) runs PX4 or ArduPilot and handles low-level stabilisation. MAVSDK is the Python library that lets the Pi send commands (arm, takeoff, goto, land) and receive telemetry (GPS, heading, altitude) from the FC.
+**What it does:** The flight controller (FC) is the SpeedyBee F405 running ArduCopter and handles low-level stabilisation. pymavlink/MAVSDK is the Python library that lets the Pi send commands (arm, takeoff, goto, land) and receive telemetry (GPS, heading, altitude) from the FC.
 
 **Connection string:** `udp://:14540` (via MAVProxy bridge)
 
@@ -122,7 +122,7 @@ mavproxy.py --master=/dev/serial0,57600 --out=udp:127.0.0.1:14540
 pip3 install mavsdk
 ```
 
-**Recommended FC settings (PX4):**
+**Recommended FC settings (ArduCopter / SpeedyBee F405):**
 - `MPC_XY_VEL_MAX`: 1.0 m/s (slow, controlled scan)
 - `MPC_Z_VEL_MAX_UP`: 0.5 m/s (gentle takeoff)
 - `COM_RC_OVERRIDE`: 0 (disable RC override so MAVSDK has full control)

@@ -1,4 +1,4 @@
-# Migration Guide — MAVSDK/PX4 → ROS2
+# Migration Guide — ArduPilot/pymavlink → ROS2
 
 ## What is this folder?
 
@@ -21,7 +21,7 @@ Robofest 7.0 and beyond, ROS2 provides:
 |------|---------------|
 | [01_ros2_concepts.md](01_ros2_concepts.md) | What ROS2 is, its core concepts, how it differs from what we have |
 | [02_mavsdk_to_ros2.md](02_mavsdk_to_ros2.md) | Side-by-side code: our MAVSDK code → equivalent ROS2 code |
-| [03_px4_ros2_bridge.md](03_px4_ros2_bridge.md) | How to connect PX4 to ROS2 using uXRCE-DDS (replacing MAVProxy) |
+| [03_ardupilot_ros2_bridge.md](03_ardupilot_ros2_bridge.md) | How to connect ArduCopter to ROS2 using AP_DDS (replacing MAVProxy) |
 | [04_swarm_in_ros2.md](04_swarm_in_ros2.md) | How to port our 3-drone swarm architecture to ROS2 namespaces |
 | [05_migration_plan.md](05_migration_plan.md) | Step-by-step migration plan with effort estimates |
 
@@ -32,7 +32,7 @@ Robofest 7.0 and beyond, ROS2 provides:
 **If you're brand new to ROS2:** Read `01_ros2_concepts.md` first. It explains everything
 from scratch. Then read `02_mavsdk_to_ros2.md` to see concrete code comparisons.
 
-**If you know ROS2 already:** Jump straight to `03_px4_ros2_bridge.md` for the PX4
+**If you know ROS2 already:** Jump straight to `03_ardupilot_ros2_bridge.md` for the ArduPilot
 integration specifics, then `04_swarm_in_ros2.md` for swarm architecture.
 
 **If you're planning the migration sprint:** Read `05_migration_plan.md`.
@@ -43,7 +43,7 @@ integration specifics, then `04_swarm_in_ros2.md` for swarm architecture.
 
 ```
 Slave drone:
-  Python scripts → MAVSDK → MAVProxy (serial bridge) → Pixhawk (PX4)
+  Python scripts → MAVSDK/pymavlink → MAVProxy (serial bridge) → SpeedyBee F405 (ArduCopter)
   Manual asyncio tasks for each pipeline step
   Manual UDP/TCP sockets for inter-drone communication
 
@@ -60,7 +60,7 @@ Master drone:
 
 ```
 Slave drone:
-  ROS2 nodes → px4_msgs topics → uXRCE-DDS agent → Pixhawk (PX4)
+  ROS2 nodes → ardupilot_msgs topics → AP_DDS agent → SpeedyBee F405 (ArduCopter)
   Each pipeline step = one ROS2 node
   Inter-node communication via ROS2 topics/services/actions
 
@@ -74,9 +74,9 @@ Master drone:
 
 ## Key external references
 
-- PX4 ROS2 User Guide: https://docs.px4.io/main/en/ros2/user_guide
-- uXRCE-DDS bridge docs: https://docs.px4.io/main/en/middleware/uxrce_dds
+- ArduPilot ROS2 docs: https://ardupilot.org/dev/docs/ros2.html
+- AP_DDS bridge docs: https://ardupilot.org/dev/docs/ros2-ap_dds.html
 - ROS2 Humble docs: https://docs.ros.org/en/humble/
-- px4-offboard Python example: https://github.com/Jaeyoung-Lim/px4-offboard
-- px4_ros2_interface_lib: https://docs.px4.io/main/en/ros2/px4_ros2_control_interface
+- ArduPilot ROS2 offboard example: https://github.com/ArduPilot/ardupilot/tree/master/libraries/AP_DDS
+- ardupilot_ros package: https://github.com/ArduPilot/ardupilot_ros
 - swarm_ros_bridge: https://github.com/carryowen/swarm_ros_bridge

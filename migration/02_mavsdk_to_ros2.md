@@ -4,9 +4,9 @@ This file shows our exact MAVSDK code alongside the ROS2 equivalent, section by 
 You don't need to delete MAVSDK — you can wrap it inside a ROS2 node as a transition step.
 
 **Reference implementations:**
-- px4-offboard Python example: https://github.com/Jaeyoung-Lim/px4-offboard
+- ArduPilot ROS2 offboard example: https://github.com/ArduPilot/ardupilot/tree/master/libraries/AP_DDS
 - MAVROS2 (alternative): https://github.com/mavlink/mavros/blob/ros2/mavros/README.md
-- PX4 ROS2 offboard docs: https://docs.px4.io/main/en/ros2/offboard_control
+- ArduPilot ROS2 docs: https://ardupilot.org/dev/docs/ros2.html
 
 ---
 
@@ -46,14 +46,14 @@ class MavsdkNode(Node):
         self.create_service(Trigger, 'arm',  self.handle_arm)
         self.create_service(Trigger, 'land', self.handle_land)
 
-        # Connect to PX4 on startup
+        # Connect to ArduCopter (SpeedyBee F405) on startup
         self.loop.run_until_complete(self.connect())
 
     async def connect(self):
         await self.drone.connect(system_address="udp://:14540")
         async for state in self.drone.core.connection_state():
             if state.is_connected:
-                self.get_logger().info("PX4 connected")
+                self.get_logger().info("ArduCopter connected")
                 break
 
     def on_cmd_pose(self, msg):
@@ -76,13 +76,13 @@ class MavsdkNode(Node):
 
 ---
 
-## Approach B: Native ROS2 with px4_msgs (cleanest, recommended long-term)
+## Approach B: Native ROS2 with ardupilot_msgs (cleanest, recommended long-term)
 
-Instead of using MAVSDK, talk directly to PX4 over uXRCE-DDS. PX4 publishes and
-subscribes to `px4_msgs` topics directly — no MAVProxy needed.
+Instead of using MAVSDK, talk directly to ArduCopter over AP_DDS. ArduCopter publishes and
+subscribes to `ardupilot_msgs` topics directly — no MAVProxy needed.
 
 This is the approach described in:
-https://docs.px4.io/main/en/ros2/offboard_control
+https://ardupilot.org/dev/docs/ros2-ap_dds.html
 
 ### Installation
 
@@ -90,17 +90,18 @@ https://docs.px4.io/main/en/ros2/offboard_control
 # 1. Install ROS2 Humble
 # https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debs.html
 
-# 2. Install Micro XRCE-DDS Agent (runs on RPi, bridges PX4 to ROS2)
+# 2. Install Micro XRCE-DDS Agent (runs on RPi, bridges ArduCopter to ROS2)
 pip3 install micro-xrce-dds-agent
 # OR build from source:
 git clone https://github.com/eProsima/Micro-XRCE-DDS-Agent.git
 cd Micro-XRCE-DDS-Agent && mkdir build && cd build
 cmake .. && make && sudo make install
 
-# 3. Create workspace and clone px4_msgs
+# 3. Create workspace and clone ardupilot_msgs
 mkdir -p ~/ros2_ws/src && cd ~/ros2_ws/src
-git clone https://github.com/PX4/px4_msgs.git
-git clone https://github.com/PX4/px4_ros_com.git
+git clone https://github.com/ArduPilot/ardupilot_msgs.git
+# (px4_ros_com is PX4-only; for ArduPilot use ardupilot_ros instead)
+git clone https://github.com/ArduPilot/ardupilot_ros.git
 
 # 4. Build
 cd ~/ros2_ws
@@ -111,7 +112,7 @@ source install/setup.bash
 ### Start the bridge (replaces MAVProxy)
 
 ```bash
-# On the Raspberry Pi — connect via serial to Pixhawk:
+# On the Raspberry Pi — connect via serial to SpeedyBee F405 (ArduCopter):
 MicroXRCEAgent serial --dev /dev/ttyAMA0 -b 921600
 
 # OR over UDP (for SITL testing):
@@ -133,18 +134,18 @@ async def arm_and_takeoff(drone, altitude=1.5):
     await asyncio.sleep(5)   # wait to reach altitude
 ```
 
-### ROS2 equivalent with px4_msgs:
+### ROS2 equivalent with ardupilot_msgs:
 
 ```python
 import rclpy
 from rclpy.node import Node
-from px4_msgs.msg import VehicleCommand, OffboardControlMode, TrajectorySetpoint
+from ardupilot_msgs.msg import VehicleCommand, OffboardControlMode, TrajectorySetpoint
 
 class FlightNode(Node):
     def __init__(self):
         super().__init__('flight_node')
 
-        # Publishers — send commands to PX4
+        # Publishers — send commands to ArduCopter via AP_DDS
         self.cmd_pub = self.create_publisher(
             VehicleCommand, '/fmu/in/vehicle_command', 10)
         self.offboard_pub = self.create_publisher(
@@ -152,12 +153,12 @@ class FlightNode(Node):
         self.setpoint_pub = self.create_publisher(
             TrajectorySetpoint, '/fmu/in/trajectory_setpoint', 10)
 
-        # IMPORTANT: Must send setpoints before enabling offboard mode
-        # PX4 requires >2 Hz stream or it exits offboard
+        # IMPORTANT: Must send setpoints before enabling GUIDED mode
+        # ArduCopter requires >2 Hz stream or it exits GUIDED
         self.timer = self.create_timer(0.1, self.send_keepalive)
 
     def send_keepalive(self):
-        """Send offboard control mode at 10 Hz to keep PX4 in offboard."""
+        """Send control mode at 10 Hz to keep ArduCopter in GUIDED mode."""
         msg = OffboardControlMode()
         msg.position = True    # we're doing position control
         msg.velocity = False
@@ -185,7 +186,7 @@ class FlightNode(Node):
         self.setpoint_pub.publish(msg)
 ```
 
-**Key difference:** In PX4's NED frame, **negative Z is UP**. Our current MAVSDK code
+**Key difference:** In ArduPilot's NED frame, **negative Z is UP**. Our current MAVSDK code
 uses positive altitude (GPS altitude above sea level). Be careful with this sign convention.
 
 ---
@@ -204,7 +205,7 @@ async def fly_to(drone, lat, lon, alt=1.5):
             break
 ```
 
-### ROS2 equivalent with px4_msgs:
+### ROS2 equivalent with ardupilot_msgs:
 
 ```python
 def goto_local(self, x, y, z=-1.5):
@@ -226,7 +227,7 @@ def goto_local(self, x, y, z=-1.5):
 **Subscribe to position feedback:**
 
 ```python
-from px4_msgs.msg import VehicleLocalPosition
+from ardupilot_msgs.msg import VehicleLocalPosition
 
 class FlightNode(Node):
     def __init__(self):
@@ -268,10 +269,10 @@ async def stream_telemetry(drone, master_ip, port=14550):
 
 ```python
 # No manual UDP code needed!
-# px4_msgs already publishes to /fmu/out/vehicle_gps_position
+# ardupilot_msgs already publishes to /fmu/out/vehicle_gps_position
 # The master simply subscribes:
 
-from px4_msgs.msg import SensorGps
+from ardupilot_msgs.msg import SensorGps
 
 class MasterNode(Node):
     def __init__(self):

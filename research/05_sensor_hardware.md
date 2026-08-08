@@ -6,7 +6,7 @@
 |--------|-----------|---------|--------|
 | MLX90640 | I²C @ 0x33 | 32×24 thermal IR camera | `slave/src/mlx_stdout.cpp` (C++ subprocess) |
 | TF-Luna | UART (serial) | 1D LIDAR obstacle detection | `tf_luna_failsafe.py` |
-| RPi Camera / GPS | (via PX4) | MAVSDK flight control | `mavsdk` Python library |
+| RPi Camera / GPS | (via ArduPilot) | pymavlink/MAVSDK flight control | `pymavlink`, `mavsdk` Python libraries |
 
 ---
 

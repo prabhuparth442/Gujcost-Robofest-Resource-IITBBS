@@ -27,8 +27,8 @@ codebase that doesn't work.
    - "Writing a simple publisher and subscriber (Python)"
    - "Writing a simple service and client (Python)"
 
-3. Run the px4-offboard Python example against SITL:
-   https://github.com/Jaeyoung-Lim/px4-offboard
+3. Run the ArduPilot ROS2 example against SITL:
+   https://ardupilot.org/dev/docs/ros2-ap_dds.html
 
 4. Read `migration/01_ros2_concepts.md` and `migration/02_mavsdk_to_ros2.md`
 
@@ -38,7 +38,7 @@ codebase that doesn't work.
 
 ## Phase 1: Infrastructure Setup (1 week)
 
-### Goal: ROS2 workspace exists and builds; PX4 bridge works in SITL.
+### Goal: ROS2 workspace exists and builds; ArduPilot AP_DDS bridge works in SITL.
 
 **Tasks:**
 
@@ -47,12 +47,12 @@ codebase that doesn't work.
 mkdir -p ~/ros2_ws/src
 cd ~/ros2_ws/src
 
-# Clone PX4 message definitions
-git clone https://github.com/PX4/px4_msgs.git
+# Clone ArduPilot message definitions
+git clone https://github.com/ArduPilot/ardupilot_msgs.git
 git checkout release/1.14   # match your firmware
 
-# Clone the PX4 ROS2 communication examples (reference code)
-git clone https://github.com/PX4/px4_ros_com.git
+# Clone the ArduPilot ROS2 package (reference code)
+git clone https://github.com/ArduPilot/ardupilot_ros.git
 
 cd ~/ros2_ws
 colcon build
@@ -66,10 +66,10 @@ ros2 pkg create mine_interfaces --build-type ament_cmake
 # Then create the .msg and .srv files from migration/04_swarm_in_ros2.md
 ```
 
-**1.3 — Verify uXRCE-DDS Agent with SITL:**
+**1.3 — Verify AP_DDS (ArduPilot DDS bridge) Agent with SITL:**
 ```bash
-# Terminal 1: PX4 SITL
-make px4_sitl gazebo-classic_iris
+# Terminal 1: ArduCopter SITL
+cd ardupilot/ArduCopter && sim_vehicle.py -v ArduCopter -f gazebo-iris --console --map
 
 # Terminal 2: Agent (SITL uses UDP)
 MicroXRCEAgent udp4 --port 8888
@@ -86,7 +86,7 @@ ros2 topic echo /fmu/out/vehicle_local_position
 
 ## Phase 2: Migrate Flight Controller (1 week)
 
-### Goal: Replace MAVSDK flight commands with px4_msgs. Keep detection pipeline unchanged.
+### Goal: Replace MAVSDK flight commands with ardupilot_msgs. Keep detection pipeline unchanged.
 
 **Why this first?** Flight is the most safety-critical part. Get it right before touching detection.
 
@@ -95,12 +95,12 @@ ros2 topic echo /fmu/out/vehicle_local_position
 **2.1 — Create `drone_flight` package:**
 ```bash
 cd ~/ros2_ws/src
-ros2 pkg create drone_flight --build-type ament_python --dependencies rclpy px4_msgs
+ros2 pkg create drone_flight --build-type ament_python --dependencies rclpy ardupilot_msgs
 ```
 
 **2.2 — Write `flight_controller_node.py`:**
 
-Copy the `minimal_offboard.py` from `migration/03_px4_ros2_bridge.md` as a starting point.
+Copy the `minimal_offboard.py` from `migration/03_ardupilot_ros2_bridge.md` as a starting point.
 Extend it to handle our full waypoint sequence:
 
 ```python
@@ -120,7 +120,7 @@ Write a test launch file that sends the drone to 5 waypoints in SITL and verifie
 
 **2.4 — Test on real drone (tethered, indoors):**
 
-Strap the Pi to a bench with Pixhawk attached. Test arm/takeoff/land only.
+Strap the Pi to a bench with SpeedyBee F405 attached. Test arm/takeoff/land only.
 Do not fly freely until Phase 3 is complete.
 
 **Done when:** `ros2 service call /drone1/goto_waypoint ...` makes the SITL drone reach the target.
@@ -136,7 +136,7 @@ Do not fly freely until Phase 3 is complete.
 **3.1 — Create `drone_telemetry` package:**
 ```bash
 ros2 pkg create drone_telemetry --build-type ament_python \
-    --dependencies rclpy px4_msgs mine_interfaces
+    --dependencies rclpy ardupilot_msgs mine_interfaces
 ```
 
 **3.2 — Write `telemetry_node.py`:**
@@ -268,16 +268,16 @@ to begin their scan pattern.
 
 **6.1 — Multi-drone SITL:**
 
-PX4 supports spawning multiple SITL instances on different UDP ports:
+ArduCopter supports spawning multiple SITL instances on different UDP ports:
 ```bash
 # Terminal 1: Drone 1 on port 14540
-PX4_SYS_AUTOSTART=4001 ./build/px4_sitl_default/bin/px4 -i 1
+sim_vehicle.py -v ArduCopter -f gazebo-iris -I 1 --sysid 1 --out=udp:127.0.0.1:14551
 
 # Terminal 2: Drone 2 on port 14541
-PX4_SYS_AUTOSTART=4001 ./build/px4_sitl_default/bin/px4 -i 2
+sim_vehicle.py -v ArduCopter -f gazebo-iris -I 2 --sysid 2 --out=udp:127.0.0.1:14552
 
 # Terminal 3: Drone 3 on port 14542
-PX4_SYS_AUTOSTART=4001 ./build/px4_sitl_default/bin/px4 -i 3
+sim_vehicle.py -v ArduCopter -f gazebo-iris -I 3 --sysid 3 --out=udp:127.0.0.1:14553
 ```
 
 **6.2 — Full launch:**
@@ -346,11 +346,11 @@ Start with one drone, then two, then all three.
 |-------|-----|
 | ROS2 Humble installation | https://docs.ros.org/en/humble/Installation.html |
 | ROS2 beginner tutorials | https://docs.ros.org/en/humble/Tutorials.html |
-| px4-offboard Python example | https://github.com/Jaeyoung-Lim/px4-offboard |
-| PX4 ROS2 User Guide | https://docs.px4.io/main/en/ros2/user_guide |
-| PX4 ROS2 offboard control | https://docs.px4.io/main/en/ros2/offboard_control |
-| uXRCE-DDS bridge | https://docs.px4.io/main/en/middleware/uxrce_dds |
-| px4_ros2_interface_lib (C++) | https://docs.px4.io/main/en/ros2/px4_ros2_control_interface |
+| ArduPilot ROS2 AP_DDS example | https://ardupilot.org/dev/docs/ros2-ap_dds.html |
+| ArduPilot ROS2 User Guide | https://ardupilot.org/dev/docs/ros2.html |
+| ArduPilot GUIDED mode docs | https://ardupilot.org/copter/docs/ac2_guidedmode.html |
+| AP_DDS bridge docs | https://ardupilot.org/dev/docs/ros2-ap_dds.html |
+| ardupilot_ros package | https://github.com/ArduPilot/ardupilot_ros |
 | swarm_ros_bridge | https://github.com/carryowen/swarm_ros_bridge |
 | Multi-robot namespaces | https://turtlebot.github.io/turtlebot4-user-manual/tutorials/multiple_robots.html |
 | Nav2 for path planning | https://nav2.org/ |

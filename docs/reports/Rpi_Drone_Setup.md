@@ -1,3 +1,7 @@
+> **Historical note:** This document was written when the project used a Pixhawk + PX4.
+> The current setup uses a **SpeedyBee F405 running ArduCopter**. SITL commands
+> and FC-specific parameters in this doc apply to ArduCopter SITL, not PX4 SITL.
+
 # 📘 Complete Technical Documentation: Raspberry Pi 4 Drone Companion Computer Setup
 
 **Project:** Autonomous Drone Control System for GUJCOST Competition  

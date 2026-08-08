@@ -124,9 +124,9 @@ zones, indoor buildings).
 Our solution: **origin-lock** at the start position.
 1. Before the mission: record the GPS fix at the start point → `origin_state.json`
 2. During the mission: all positions are expressed as metres offset from that origin
-3. MAVSDK `goto_location()` converts local coordinates back to GPS using our math
+3. pymavlink `SET_POSITION_TARGET_GLOBAL_INT` converts local coordinates back to GPS using our math
 
-The PX4 EKF (Extended Kalman Filter) inside the Pixhawk continues to estimate position
+The ArduPilot EKF3 (Extended Kalman Filter) inside the SpeedyBee continues to estimate position
 by fusing barometer (altitude) + accelerometer + compass — without GPS. This drifts over
 time (roughly 0.3–0.5 m/min), which is why we use a fuzzy footprint disc in the coverage
 grid rather than exact cell marking.

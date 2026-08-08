@@ -1,45 +1,45 @@
-# 03 — PX4 ↔ ROS2 Bridge Setup (uXRCE-DDS)
+# 03 — ArduPilot ↔ ROS2 Bridge Setup (AP_DDS)
 
-## What is uXRCE-DDS?
+## What is AP_DDS (ArduPilot DDS bridge)?
 
-uXRCE-DDS (micro eXtremely Resource Constrained Environments DDS) is the official bridge
-between PX4 (running on the Pixhawk) and ROS2 (running on the Raspberry Pi).
+AP_DDS (ArduPilot DDS bridge) (micro eXtremely Resource Constrained Environments DDS) is the official bridge
+between ArduCopter (running on the SpeedyBee F405) and ROS2 (running on the Raspberry Pi).
 
 **In our current system:**
 ```
-Raspberry Pi  ←serial→  MAVProxy  ←MAVLink→  Pixhawk (PX4)
+Raspberry Pi  ←serial→  MAVProxy  ←MAVLink→  SpeedyBee F405 (ArduCopter)
 ```
 
-**With uXRCE-DDS:**
+**With AP_DDS (ArduPilot DDS bridge):**
 ```
-Raspberry Pi (uXRCE-DDS Agent)  ←serial/UDP→  Pixhawk (uXRCE-DDS Client built into PX4)
+Raspberry Pi (AP_DDS Agent)  ←serial/UDP→  SpeedyBee F405 (AP_DDS Client built into ArduCopter)
 ```
 
-The Agent runs on the Pi. The Client is already compiled into PX4 firmware (v1.14+).
+The Agent runs on the Pi. The Client is already compiled into ArduPilot firmware (v1.14+).
 Topics appear in ROS2 as if they were published by regular ROS2 nodes.
 
 **Official docs:**
-- uXRCE-DDS bridge: https://docs.px4.io/main/en/middleware/uxrce_dds
-- PX4 ROS2 User Guide: https://docs.px4.io/main/en/ros2/user_guide
-- ROS2 User Guide (gitbook): https://px4.gitbook.io/px4-user-guide/robotics/ros/ros2/ros2_comm
+- AP_DDS bridge docs: https://ardupilot.org/dev/docs/ros2-ap_dds.html
+- ArduPilot ROS2 docs: https://ardupilot.org/dev/docs/ros2.html
+- ardupilot_ros package: https://github.com/ArduPilot/ardupilot_ros
 
 ---
 
-## Step 1: Update PX4 firmware
+## Step 1: Update ArduPilot firmware
 
-uXRCE-DDS client is built into PX4 v1.14 and later. Check your version in QGroundControl:
+AP_DDS client is built into ArduCopter v4.5 and later. Check your version in Mission Planner:
 Vehicle Setup → Summary → Firmware Version.
 
 If below v1.14, update via QGroundControl:
-1. Connect Pixhawk via USB
+1. Connect SpeedyBee F405 via USB
 2. QGroundControl → Vehicle Setup → Firmware
-3. Select "PX4 Pro" and "Advanced" → specify v1.14 or stable
+3. Check firmware version → must be ArduCopter v4.5 or newer for AP_DDS
 
 ---
 
-## Step 2: Enable uXRCE-DDS client in PX4
+## Step 2: Enable AP_DDS client in ArduCopter
 
-The client needs to be enabled via PX4 parameters.
+The client needs to be enabled via ArduCopter parameters in Mission Planner.
 
 In QGroundControl → Vehicle Setup → Parameters, search for:
 
@@ -53,13 +53,13 @@ In QGroundControl → Vehicle Setup → Parameters, search for:
 If you prefer UDP (for SITL or WiFi testing), set:
 | `UXRCE_DDS_CFG` | 1000 (ethernet/UDP) |
 
-Restart the Pixhawk after changing parameters.
+Restart the SpeedyBee after changing parameters.
 
 ---
 
 ## Step 3: Install Micro XRCE-DDS Agent on Raspberry Pi
 
-The Agent bridges PX4's serial/UDP stream to ROS2 DDS topics.
+The Agent bridges ArduCopter's serial/UDP stream to ROS2 DDS topics.
 
 ### Option A: Install from pip (easiest)
 
@@ -95,7 +95,7 @@ source install/setup.bash
 
 ### Serial connection (physical drone):
 
-The Pixhawk's TELEM2 port → USB-to-serial adapter (or directly to Pi GPIO UART):
+The SpeedyBee's UART6 (T6/R6 pads) → directly to Pi GPIO UART (see hardware/README.md):
 
 ```bash
 # If using /dev/ttyAMA0 (Pi GPIO UART, same as our MAVProxy setup):
@@ -108,7 +108,7 @@ MicroXRCEAgent serial --dev /dev/ttyUSB0 -b 921600
 ### UDP connection (SITL testing):
 
 ```bash
-# PX4 SITL sends uXRCE-DDS data to UDP port 8888 by default
+# ArduCopter SITL exposes AP_DDS data to UDP port 8888 by default
 MicroXRCEAgent udp4 --port 8888
 ```
 
@@ -118,7 +118,7 @@ You should see output like:
 [1706789015.456789] info     | Root.cpp | set_verbose_level | Session established
 ```
 
-If the session is established, PX4 topics are now live in ROS2.
+If the session is established, ArduCopter topics are now live in ROS2.
 
 ---
 
@@ -129,7 +129,7 @@ If the session is established, PX4 topics are now live in ROS2.
 source /opt/ros/humble/setup.bash
 source ~/ros2_ws/install/setup.bash
 
-# List all PX4 topics:
+# List all ArduCopter AP_DDS topics:
 ros2 topic list
 
 # You should see topics like:
@@ -148,32 +148,32 @@ ros2 topic echo /fmu/out/sensor_gps
 
 ---
 
-## Step 6: Clone px4_msgs into your workspace
+## Step 6: Clone ardupilot_msgs into your workspace
 
-Your ROS2 nodes need the `px4_msgs` package to understand PX4 message types.
-**The version of `px4_msgs` must match your PX4 firmware version.**
+Your ROS2 nodes need the `ardupilot_msgs` package to understand ArduPilot message types.
+**The version of `ardupilot_msgs` must match your ArduPilot firmware version.**
 
 ```bash
 cd ~/ros2_ws/src
-git clone https://github.com/PX4/px4_msgs.git
-cd px4_msgs
+git clone https://github.com/ArduPilot/ardupilot_msgs.git
+cd ardupilot_msgs
 
-# Checkout the branch matching your PX4 firmware version:
-git checkout release/1.14   # for PX4 v1.14
-# git checkout main          # for latest development PX4
+# Checkout the branch matching your ArduPilot firmware version:
+git checkout ArduCopter-4.5  # match your ArduCopter version
+# git checkout master         # for latest development ArduCopter
 
 cd ~/ros2_ws
-colcon build --packages-select px4_msgs
+colcon build --packages-select ardupilot_msgs
 source install/setup.bash
 ```
 
 ---
 
-## Key px4_msgs topics reference
+## Key ardupilot_msgs topics reference
 
-### Topics PX4 publishes (we subscribe to these):
+### Topics ArduCopter publishes via AP_DDS (we subscribe to these):
 
-| ROS2 topic | px4_msgs type | What it contains |
+| ROS2 topic | ardupilot_msgs type | What it contains |
 |------------|--------------|-----------------|
 | `/fmu/out/vehicle_local_position` | `VehicleLocalPosition` | x, y, z in metres from origin (NED) |
 | `/fmu/out/sensor_gps` | `SensorGps` | latitude, longitude, altitude |
@@ -182,37 +182,37 @@ source install/setup.bash
 | `/fmu/out/vehicle_status` | `VehicleStatus` | armed status, nav state |
 | `/fmu/out/sensor_combined` | `SensorCombined` | accelerometer + gyro (raw IMU) |
 
-### Topics we publish to (PX4 subscribes to these):
+### Topics we publish to (ArduCopter subscribes to these):
 
-| ROS2 topic | px4_msgs type | What it does |
+| ROS2 topic | ardupilot_msgs type | What it does |
 |------------|--------------|-------------|
 | `/fmu/in/vehicle_command` | `VehicleCommand` | Arm, disarm, takeoff, land, set mode |
-| `/fmu/in/offboard_control_mode` | `OffboardControlMode` | Keep-alive for offboard mode (>2 Hz!) |
+| `/ap/cmd_vel` | `TwistStamped` | Velocity command in GUIDED mode |
 | `/fmu/in/trajectory_setpoint` | `TrajectorySetpoint` | Go to position / velocity setpoint |
 
-**Critical:** PX4 will exit offboard mode if `OffboardControlMode` messages stop arriving
+**Critical:** ArduCopter will revert to HOLD if waypoint commands stop arriving at >2 Hz
 for >500 ms. Always publish this at 10+ Hz in a background timer, not just when moving.
 
 ---
 
-## Complete minimal offboard example
+## Complete minimal GUIDED mode example
 
 This is a complete node that: connects, arms, takes off, flies to a local position, lands.
-Adapted from: https://github.com/Jaeyoung-Lim/px4-offboard
+Reference: https://ardupilot.org/dev/docs/ros2-ap_dds.html
 
 ```python
 #!/usr/bin/env python3
 """
-minimal_offboard.py — Minimal PX4 offboard position control via ROS2
+minimal_guided.py — Minimal ArduCopter GUIDED mode position control via ROS2
 Replaces our main_orchestrator_competition.py flight section.
 
 Run: ros2 run drone_flight minimal_offboard
-Requires: px4_msgs installed, MicroXRCEAgent running
+Requires: ardupilot_msgs installed, MicroXRCEAgent running
 """
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
-from px4_msgs.msg import (
+from ardupilot_msgs.msg import (
     OffboardControlMode, TrajectorySetpoint,
     VehicleCommand, VehicleLocalPosition, VehicleStatus
 )
@@ -221,7 +221,7 @@ class MinimalOffboard(Node):
     def __init__(self):
         super().__init__('minimal_offboard')
 
-        # QoS profile that matches PX4's publisher settings
+        # QoS profile that matches ArduCopter AP_DDS publisher settings
         qos = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
             durability=DurabilityPolicy.TRANSIENT_LOCAL,
@@ -259,13 +259,13 @@ class MinimalOffboard(Node):
         self.armed = (msg.arming_state == 2)   # 2 = ARMED
 
     def control_loop(self):
-        # Always send offboard keepalive first
+        # Always send GUIDED mode keepalive first
         self.publish_offboard_mode()
 
         self.offboard_counter += 1
 
         if self.offboard_counter == 10:
-            # After 1 second of setpoints, enable offboard mode
+            # After 1 second of setpoints, enable GUIDED mode
             self.set_offboard_mode()
 
         if self.offboard_counter == 20:
@@ -339,11 +339,11 @@ if __name__ == '__main__':
 
 Run it:
 ```bash
-# Terminal 1: Start uXRCE-DDS agent
+# Terminal 1: Start AP_DDS (ArduPilot DDS bridge) agent
 MicroXRCEAgent udp4 --port 8888   # for SITL
 
-# Terminal 2: Start PX4 SITL
-cd PX4-Autopilot && make px4_sitl gazebo-classic_iris
+# Terminal 2: Start ArduCopter SITL
+cd ardupilot/ArduCopter && sim_vehicle.py -v ArduCopter -f gazebo-iris --console --map
 
 # Terminal 3: Run the node
 source ~/ros2_ws/install/setup.bash
@@ -352,14 +352,14 @@ ros2 run drone_flight minimal_offboard
 
 ---
 
-## Comparison: MAVProxy vs uXRCE-DDS Agent
+## Comparison: MAVProxy vs AP_DDS (ArduPilot DDS bridge) Agent
 
-| Feature | MAVProxy | uXRCE-DDS Agent |
+| Feature | MAVProxy | AP_DDS (ArduPilot DDS bridge) Agent |
 |---------|---------|-----------------|
 | Protocol | MAVLink | DDS |
 | Interface | Python/C API (MAVSDK) | ROS2 topics |
 | CPU usage | Low | Medium |
 | Latency | ~10 ms | ~5 ms |
-| PX4 version | Any | v1.14+ |
+| ArduCopter version | Any | v4.5+ |
 | Dependency | `pip install MAVProxy` | Build from source or pip |
-| Compatibility | ArduPilot too | PX4 only |
+| Compatibility | ArduPilot ✓ | ArduPilot ✓ |

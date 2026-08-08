@@ -155,5 +155,5 @@ Our implementation addresses all five areas:
 - Navigation: local coordinate system + A* path planner, no GPS
 - Sensors: MLX90640 thermal (two-band), TF-Luna LIDAR
 - AI: two-stage detection pipeline, persistence verification, A* path planning
-- Stability: MAVSDK PX4 with automatic failsafe sidestep
+- Stability: ArduCopter / pymavlink with automatic failsafe sidestep
 - Innovation: Vosk offline voice control, passive coverage grid, dual thermal bands

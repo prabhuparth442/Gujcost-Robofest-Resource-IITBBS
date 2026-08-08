@@ -29,7 +29,7 @@ The solution is **namespacing**: prefix every topic with the drone's ID.
 ├── vision_filter_node    (subscribes frame, publishes /droneN/detection/candidate)
 ├── persistence_node      (subscribes candidate, re-hovers, publishes /droneN/detection/confirmed)
 ├── coordinate_math_node  (subscribes confirmed, publishes /droneN/detection/mine_gps)
-├── flight_controller_node (subscribes to /droneN/cmd_waypoint, controls PX4)
+├── flight_controller_node (subscribes to /droneN/cmd_waypoint, controls ArduCopter via AP_DDS)
 └── telemetry_node        (publishes /droneN/gps and /droneN/grid_snapshot)
 ```
 
@@ -64,7 +64,7 @@ ros2_ws/
     │
     ├── drone_thermal/            ← MLX90640 camera node
     ├── drone_detection/          ← vision_filter + persistence + coordinate_math nodes
-    ├── drone_flight/             ← flight_controller node (PX4 via px4_msgs)
+    ├── drone_flight/             ← flight_controller node (ArduCopter via ardupilot_msgs)
     ├── drone_telemetry/          ← telemetry publisher node
     └── drone_master/             ← all master nodes
 ```
@@ -342,8 +342,8 @@ Before running the full swarm on 4 separate Raspberry Pis:
 - [ ] `export ROS_LOCALHOST_ONLY=0` on all machines
 - [ ] `source /opt/ros/humble/setup.bash` in `~/.bashrc` on all machines
 - [ ] `source ~/ros2_ws/install/setup.bash` in `~/.bashrc` on all machines
-- [ ] uXRCE-DDS Agent running on each slave Pi before starting nodes
-- [ ] `px4_msgs` branch matches PX4 firmware version on all machines
+- [ ] AP_DDS (ArduPilot DDS bridge) Agent running on each slave Pi before starting nodes
+- [ ] `ardupilot_msgs` branch matches ArduPilot firmware version on all machines
 - [ ] Firewall rules allow DDS UDP ports (7400–7500 range by default)
 
 Test discovery:

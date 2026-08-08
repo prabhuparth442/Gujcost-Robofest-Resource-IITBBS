@@ -196,7 +196,7 @@ def check_mavsdk() -> bool:
         except (ConnectionRefusedError, OSError):
             warn(
                 f"MAVSDK gRPC port {MAVSDK_GRPC}  not responding\n"
-                "    Simulation: start mavsdk_server or PX4 SITL first\n"
+                "    Simulation: start mavsdk_server or ArduCopter SITL first\n"
                 "    Hardware:   ensure flight-controller is connected"
             )
     return True   # non-fatal — master.py retries internally

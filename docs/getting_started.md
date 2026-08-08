@@ -31,12 +31,12 @@ the "brain" of the drone. All our Python code runs here.
 
 Think of it like a very small laptop attached to the drone.
 
-### PX4 Flight Controller (Pixhawk)
-A dedicated circuit board that handles the actual flying — keeping the drone stable,
-reading the motor speeds, handling the gyroscope. It talks to the Raspberry Pi over
-a serial cable.
+### SpeedyBee F405 (ArduCopter)
+A dedicated All-in-One flight controller + ESC board that handles the actual flying —
+keeping the drone stable, reading motor speeds, handling the gyroscope. It talks to
+the Raspberry Pi over a UART serial connection.
 
-You write Python code on the Pi, and the Pi tells the Pixhawk where to fly.
+You write Python code on the Pi, and the Pi tells the SpeedyBee where to fly.
 
 ### MLX90640 Thermal Camera
 A tiny sensor (roughly the size of a postage stamp) that measures temperature at
@@ -61,7 +61,7 @@ Master Drone (Raspberry Pi 4)
     │  sends flight commands over WiFi → Slave Drones
     ▼
 Slave Drones (Raspberry Pi 4 × 3)
-    │  each runs the detection pipeline + MAVSDK to fly
+    │  each runs the detection pipeline + pymavlink/MAVSDK to fly
     │  sends mine reports back → Master
 ```
 
@@ -72,26 +72,37 @@ Everything communicates over a **local WiFi network** that the master drone crea
 
 ## Key concepts explained simply
 
-### What is MAVSDK?
-MAVSDK is a Python library that lets you control a PX4 flight controller from code.
-Instead of manually setting motor speeds, you say things like:
+### What is MAVSDK / pymavlink?
+MAVSDK and pymavlink are Python libraries that let you control an ArduPilot flight
+controller from code. Instead of manually setting motor speeds, you say things like:
 
 ```python
+# MAVSDK style:
 await drone.action.arm()
 await drone.action.takeoff()
 await drone.goto_location(lat, lon, altitude)
+
+# pymavlink style (lower-level, more control):
+mav.arducopter_arm()
+mav.mav.command_long_send(...)  # MAV_CMD_NAV_TAKEOFF
 ```
 
-MAVSDK translates those into MAVLink messages that the Pixhawk understands.
+Both translate into **MAVLink** messages that the SpeedyBee F405 understands.
 
-**MAVLink** is the radio protocol drones use to receive commands — think of it like
-the language the Pixhawk speaks. MAVSDK handles the translation so you don't need
-to learn MAVLink directly.
+**MAVLink** is the protocol ArduPilot uses to receive commands — think of it like
+the language the SpeedyBee speaks. MAVSDK/pymavlink handle the translation so you
+don't need to learn raw MAVLink directly.
 
-### What is offboard mode?
-By default, a Pixhawk listens to an RC transmitter (a remote control). "Offboard mode"
-means the Pixhawk instead listens to commands from the companion computer (our Pi).
-MAVSDK switches the Pixhawk into this mode automatically.
+**MAVProxy** is a ground-station bridge that sits between the Pi and the SpeedyBee,
+forwarding MAVLink over UDP so both MAVSDK and ground control apps can connect.
+
+### What is GUIDED mode?
+By default, the SpeedyBee listens to an RC transmitter (a remote control). **GUIDED mode**
+is ArduCopter's equivalent of offboard control — the FC instead accepts waypoint commands
+from the companion computer (our Pi). MAVSDK/pymavlink request this mode automatically
+before sending flight commands.
+
+In Mission Planner this shows as "Mode: GUIDED" in the status bar.
 
 ### What is asyncio?
 Python code normally runs one line at a time. `asyncio` lets Python do multiple things
@@ -197,26 +208,34 @@ If you're looking for something specific:
 
 ## Running a simulated mission (SITL)
 
-SITL stands for **Software In The Loop** — it simulates a real Pixhawk on your laptop.
+SITL stands for **Software In The Loop** — it simulates a real ArduCopter flight
+controller on your laptop.
 You can run the full slave drone code without any physical drone.
 
-### Install PX4 SITL (on your laptop, not the Pi)
+### Install ArduCopter SITL (on your laptop, not the Pi)
 
 ```bash
-git clone https://github.com/PX4/PX4-Autopilot.git --recursive
-cd PX4-Autopilot
-bash Tools/setup/ubuntu.sh
-make px4_sitl gazebo-classic_iris
+# Install prerequisites
+pip install --user mavproxy
+git clone https://github.com/ArduPilot/ardupilot.git
+cd ardupilot
+./Tools/environment_install/install-prereqs-ubuntu.sh -y
+. ~/.profile
+
+# Run SITL (opens a simulated ArduCopter)
+cd ArduCopter
+sim_vehicle.py -v ArduCopter -f gazebo-iris --console --map
 ```
 
-This will open a Gazebo window with a simulated drone. MAVSDK connects to it over UDP
-port 14540 — exactly the same as the real drone.
+This opens MAVProxy console + a map view with a simulated drone. MAVSDK or pymavlink
+connects to it over UDP port 14540 (via MAVProxy) — exactly the same as the real drone.
 
 ### Run the slave code against SITL
 
 ```bash
-# Terminal 1: PX4 SITL (leave running)
-cd PX4-Autopilot && make px4_sitl gazebo-classic_iris
+# Terminal 1: ArduCopter SITL (leave running)
+cd ardupilot/ArduCopter
+sim_vehicle.py -v ArduCopter -f gazebo-iris --console --map
 
 # Terminal 2: slave flight test
 cd Gujcost_Files
@@ -235,8 +254,8 @@ coming from the pre-recorded test data.
 | `Permission denied` running mlx_stdout | Run with `sudo` — BCM2835 needs root for GPIO |
 | `No heartbeat received` from MAVSDK | MAVProxy is not running; start it first |
 | Flask shows "http" but phone mic doesn't work | Flask must use HTTPS; generate TLS cert (see `master/SETUP.md`) |
-| `ModuleNotFoundError: mavsdk` | Run `pip3 install mavsdk --break-system-packages` |
-| Drone arms but doesn't move | Pixhawk rejected offboard mode; check RC is off or overridden |
+| `ModuleNotFoundError: mavsdk` | Run `pip3 install mavsdk pymavlink --break-system-packages` |
+| Drone arms but doesn't move | ArduCopter rejected GUIDED mode; check RC mode switch and GUID param |
 | Thermal frame is all zeros | MLX binary crashed; check I²C wiring and run with sudo |
 
 ---
@@ -245,7 +264,7 @@ coming from the pre-recorded test data.
 
 | Term | Plain English |
 |------|-------------|
-| EKF | Extended Kalman Filter — the maths inside the Pixhawk that fuses all sensor readings into a position estimate |
+| EKF | Extended Kalman Filter — the maths inside the SpeedyBee (ArduPilot EKF3) that fuses all sensor readings into a position estimate |
 | FPN | Fixed Pattern Noise — systematic hot/cold pixel errors baked into the thermal sensor that we subtract out |
 | NED | North-East-Down coordinate frame — standard aviation coordinate system |
 | GPS | Global Positioning System — satellite-based location. Banned during mission; only used to set origin |

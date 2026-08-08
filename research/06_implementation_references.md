@@ -28,12 +28,12 @@ Use this when setting up a new drone from scratch or when something breaks.
 ### Offboard mode
 
 MAVSDK requires the drone to be in **offboard mode** before `goto_location()` works.
-Our code enables this automatically — but if PX4 rejects offboard mode, check:
-1. RC transmitter is off (PX4 requires RC off or RC override for offboard)
+Our code enables this automatically — but if ArduPilot rejects GUIDED mode, check:
+1. RC is in a position that allows GUIDED mode (set MODE switch or use Mission Planner)
 2. SITL is running (for testing) or real flight controller connected
 3. MAVProxy bridge is active (port 14540)
 
-### Connecting to PX4
+### Connecting to ArduCopter (SpeedyBee F405)
 
 ```bash
 # On the drone (replaces direct USB with UDP bridge)
@@ -53,27 +53,28 @@ MAVSDK connects to `udp://:14540` — this is the default in our code.
 
 ---
 
-## PX4 Autopilot — Offboard Control
+## ArduPilot — GUIDED Mode
 
-**Official docs:** https://docs.px4.io/main/en/flight_modes/offboard.html  
-**Parameters reference:** https://docs.px4.io/main/en/advanced_config/parameter_reference.html
+**Official docs:** https://ardupilot.org/copter/docs/ac2_guidedmode.html  
+**Parameters reference:** https://ardupilot.org/copter/docs/parameters.html
 
-### Offboard mode rules
+### GUIDED mode rules (ArduCopter)
 
-- PX4 must receive setpoints at >2 Hz or it will exit offboard and fall back to hold mode
+- ArduCopter must receive setpoints at >2 Hz in GUIDED mode or it will hold position
 - Our code sends waypoints sequentially — if `goto_location()` awaits completion (>500 ms
-  between waypoints), the drone may exit offboard mid-flight
-- **Fix:** Call `drone.offboard.set_velocity_body()` as a keep-alive if waypoint dwell is long
+  between waypoints), the drone may stop responding to waypoints mid-flight
+- **Fix:** Call `a velocity keep-alive MAVLink message via pymavlink` as a keep-alive if waypoint dwell is long
 
-### Key PX4 parameters to check before flight
+### Key ArduCopter parameters to check before flight (SpeedyBee F405)
 
 | Parameter | Recommended | Purpose |
 |-----------|-------------|---------|
-| `COM_RC_LOSS_T` | 5.0 s | RC loss timeout before failsafe |
-| `EKF2_AID_MASK` | 1 (GPS) | Which sensors EKF fuses |
-| `MPC_XY_VEL_MAX` | 3.0 m/s | Max horizontal velocity in offboard |
-| `MPC_LAND_SPEED` | 0.5 m/s | Descent rate during landing |
-| `RTL_RETURN_ALT` | 3.0 m | Return-to-launch altitude (above home) |
+| `FS_THR_ENABLE` | 1 (RTL) | RC failsafe action on signal loss |
+| `EK3_SRC1_POSXY` | 3 (GPS) | Which sensors EKF3 uses for XY position |
+| `WPNAV_SPEED` | 300 cm/s | Max horizontal speed in GUIDED/AUTO mode |
+| `LAND_SPEED` | 50 cm/s | Descent rate during landing |
+| `RTL_ALT` | 300 cm | Return-to-launch altitude above home (cm) |
+| `GUID_TIMEOUT` | 3.0 s | GUIDED mode target timeout |
 
 ---
 
@@ -82,7 +83,7 @@ MAVSDK connects to `udp://:14540` — this is the default in our code.
 **Docs:** https://ardupilot.org/mavproxy/  
 **Install:** `pip install MAVProxy`
 
-MAVProxy acts as a serial-to-UDP bridge between the Pixhawk serial port and MAVSDK.
+MAVProxy acts as a serial-to-UDP bridge between the SpeedyBee F405 serial port and MAVSDK/pymavlink.
 
 ```bash
 # Standard launch command (on RPi drone):
@@ -228,8 +229,8 @@ exact config.
 
 | Tool | Purpose |
 |------|---------|
-| QGroundControl | Monitor drone positions, check PX4 params, view SITL |
-| MAVLink Inspector (in QGC) | Debug raw MAVLink messages from PX4 |
+| Mission Planner / QGroundControl | Monitor drone positions, check ArduCopter params, view SITL |
+| MAVLink Inspector (in Mission Planner or QGC) | Debug raw MAVLink messages from ArduCopter |
 | `python -m mavsdk.server` | Start MAVSDK server manually for testing |
 | `python slave/test_suite.py` | Run offline unit tests for vision pipeline |
 | `python slave/test_mission.py` | Run a SITL simulated flight |
@@ -238,17 +239,24 @@ exact config.
 
 ---
 
-## SITL (Software-in-the-Loop) Testing
+## SITL (Software-in-the-Loop) Testing — ArduCopter
 
-PX4 SITL lets you run the full flight code without a physical drone.
+ArduCopter SITL lets you run the full flight code without a physical drone.
 
 ```bash
-# Install PX4 SITL (on development machine, not Pi):
-git clone https://github.com/PX4/PX4-Autopilot.git
-cd PX4-Autopilot
-make px4_sitl gazebo-classic_iris
+# Install ArduCopter SITL (on development machine, not Pi):
+pip install --user mavproxy
+git clone https://github.com/ArduPilot/ardupilot.git
+cd ardupilot
+./Tools/environment_install/install-prereqs-ubuntu.sh -y
+. ~/.profile
 
-# SITL connects to MAVSDK on UDP:14540 automatically
+# Run ArduCopter SITL with Gazebo (or standalone):
+cd ArduCopter
+sim_vehicle.py -v ArduCopter -f gazebo-iris --console --map
+
+# SITL listens on UDP:14550 (MAVProxy), MAVSDK connects to UDP:14540
+# mavproxy.py bridges between SITL and MAVSDK automatically
 # Run slave code as normal — it won't know it's simulated
 ```
 

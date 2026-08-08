@@ -22,7 +22,7 @@ Master Pi (ground)          Slave Drone × 3 (in air)
 Flask HTTPS server          main_orchestrator.py
 Vosk speech recognition     MLX90640 thermal camera (C++ pipe)
 A* path planner             TF-Luna LIDAR failsafe
-Grid map aggregator         PX4 / MAVSDK offboard control
+Grid map aggregator         ArduCopter / pymavlink (GUIDED mode)
 TCP commander   ←──TCP──→   tcp_channel.py  (port 14560)
                 ←──UDP──→   udp_channel.py  (port 14550, 5 Hz)
                 ←──TCP──→   mine reports    (port 5000)
@@ -83,7 +83,7 @@ Each slave flies a 4-pass lane pattern (`PASS_LANES` dict), scans at 2 m altitud
 ├── migration/              ← MAVSDK → ROS2 migration guide
 │   ├── 01_ros2_concepts.md
 │   ├── 02_mavsdk_to_ros2.md
-│   ├── 03_px4_ros2_bridge.md  (uXRCE-DDS setup)
+│   ├── 03_ardupilot_ros2_bridge.md  (AP_DDS setup)
 │   ├── 04_swarm_in_ros2.md
 │   └── 05_migration_plan.md   (7-phase, 6–8 week roadmap)
 │
@@ -124,7 +124,7 @@ Each slave flies a 4-pass lane pattern (`PASS_LANES` dict), scans at 2 m altitud
 | Part | Spec |
 |------|------|
 | Frame | <750 g total AUW |
-| FC | Pixhawk / SpeedyBee F405 running PX4 |
+| FC | SpeedyBee F405 running ArduCopter |
 | Companion | Raspberry Pi 4 (4 GB) |
 | Thermal | MLX90640 32×24 IR (I2C, 8 Hz) |
 | LIDAR | TF-Luna (UART, 100 Hz) |
@@ -166,7 +166,7 @@ python3 app.py
 
 ### 4. SITL testing (no hardware)
 
-See [`docs/getting_started.md`](docs/getting_started.md) for full PX4 SITL + MAVProxy setup.
+See [`docs/getting_started.md`](docs/getting_started.md) for full ArduCopter SITL + MAVProxy setup.
 
 ---
 
@@ -176,7 +176,7 @@ See [`docs/getting_started.md`](docs/getting_started.md) for full PX4 SITL + MAV
 Burial disturbs soil's thermal inertia. During morning warm-up or evening cool-down a buried void shows ±0.15–1.25 °C contrast against surrounding soil. Two separate filters handle buried mines vs surface discs. See [`docs/concepts.md`](docs/concepts.md) and [`research/01_thermal_mine_detection.md`](research/01_thermal_mine_detection.md).
 
 **Why no GPS on drones?**
-Competition rules prohibit GPS inside the field. Drones use a local coordinate frame: origin locked at the start GPS fix (averaged compass + 5-sample GPS mean), then dead-reckoned via PX4 EKF2 velocity integration.
+Competition rules prohibit GPS inside the field. Drones use a local coordinate frame: origin locked at the start GPS fix (averaged compass + 5-sample GPS mean), then dead-reckoned via ArduPilot EKF3 velocity integration.
 
 **Why 4-pass lane strategy?**
 A single 15×60 m pass at 55° FOV thermal width leaves gaps. Four offset passes at 1.4 m lane step give ~2× overlap for confident detection. The `PASS_LANES` dict and `SIDE_MOVE` TCP protocol coordinate all three slaves sequentially with 8 s stagger.

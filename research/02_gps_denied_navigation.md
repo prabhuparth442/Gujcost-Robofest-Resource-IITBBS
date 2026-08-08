@@ -4,7 +4,7 @@
 
 The Robofest PS explicitly bans GPS during the 10-minute mission window. Our approach:
 origin-lock at the start position (compass + GPS fix → `origin_state.json`), then use
-MAVSDK `goto_location()` which internally uses PX4 EKF fusing barometer + optical flow
+pymavlink `SET_POSITION_TARGET_GLOBAL_INT` which internally uses ArduPilot EKF3 fusing barometer + optical flow
 + compass. This works, but drift accumulates. Understanding the alternatives helps us
 harden the system and reduce positional errors over a 60 m field.
 
@@ -12,15 +12,15 @@ harden the system and reduce positional errors over a 60 m field.
 
 ## Our Current Approach
 
-**Origin-lock + dead reckoning via PX4 EKF:**
+**Origin-lock + dead reckoning via ArduPilot EKF3:**
 
 1. Pre-flight: GPS fix + compass heading averaged over 5 samples → `origin_state.json`
 2. In-flight: convert all waypoints to GPS delta from origin using `04_coordinate_math.py`
-3. PX4 takes GPS target coordinates, fuses barometer + accelerometer + compass internally
+3. ArduCopter takes GPS target coordinates, fuses barometer + accelerometer + compass internally
 4. `grid_map.py` paints coverage using *real GPS feedback* (not planned waypoints) — this
    means GPS drift gets absorbed into the coverage map passively
 
-**Weakness:** Over 60 m of field, PX4 EKF drift at ~0.3–0.5 m/min means positional error
+**Weakness:** Over 60 m of field, ArduPilot EKF3 drift at ~0.3–0.5 m/min means positional error
 at far end of the field can reach 1–2 m after 10 minutes.
 
 ---
@@ -68,7 +68,7 @@ This would be a significant improvement worth implementing.
 We already use this pattern: the master drone is the reference (it holds `origin_state.json`
 and the authoritative grid). Slaves operate relative to master-issued waypoints.
 
-**For Robofest 6.0:** When a slave loses its PX4 position estimate (EKF diverges), the
+**For Robofest 6.0:** When a slave loses its ArduPilot EKF3 position estimate (EKF diverges), the
 master can re-issue its last-known GPS position as a re-anchor command. Currently no such
 re-anchor command exists in `tcp_channel.py`. Worth adding as a fallback.
 
@@ -147,7 +147,7 @@ fx = (width_px / 2) / tan(hfov_rad / 2)
 
 ## For Robofest 6.0 — Recommended Improvements
 
-1. **Optical flow sensor** (e.g. PX4Flow or Pi camera + Lucas-Kanade) — can cut EKF drift
+1. **Optical flow sensor** (e.g. ArduPilot-compatible optical flow sensor (PX4Flow or Pi cam + Lucas-Kanade)) — can cut EKF drift
    from ~0.3 m/min to ~0.05 m/min over flat ground
 2. **UWB anchor beacons** at field corners — provide cm-level indoor positioning with no GPS;
    check if PS rules permit placing anchors at field boundary

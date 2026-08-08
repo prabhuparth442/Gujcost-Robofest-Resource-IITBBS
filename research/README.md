@@ -17,8 +17,8 @@ arxiv / DOI links inside each file.
 | [02_gps_denied_navigation.md](02_gps_denied_navigation.md) | Localisation without GPS | `00_preflight_calib.py`, coordinate system, origin_state.json |
 | [03_swarm_coordination.md](03_swarm_coordination.md) | Multi-UAV formation and task sharing | `master/app.py`, SIDE_MOVE protocol, UDP telemetry |
 | [04_path_planning.md](04_path_planning.md) | Coverage path planning and A* variants | `fieldmap.py`, A* in `master/app.py` |
-| [05_sensor_hardware.md](05_sensor_hardware.md) | MLX90640, TF-Luna, MAVSDK/PX4 | `slave/src/mlx_stdout.cpp`, `tf_luna_failsafe.py` |
-| [06_implementation_references.md](06_implementation_references.md) | MAVSDK, Vosk, PX4 offboard — official docs | All drone flight code |
+| [05_sensor_hardware.md](05_sensor_hardware.md) | MLX90640, TF-Luna, ArduPilot/pymavlink | `slave/src/mlx_stdout.cpp`, `tf_luna_failsafe.py` |
+| [06_implementation_references.md](06_implementation_references.md) | pymavlink, MAVProxy, Vosk, ArduCopter GUIDED mode — official docs | All drone flight code |
 
 ---
 
@@ -74,7 +74,7 @@ arxiv / DOI links inside each file.
 
 19. **[MAVSDK-Python]** MAVSDK. *MAVSDK-Python Documentation*. https://mavsdk.mavlink.io/main/en/python/
 
-20. **[PX4 Offboard]** PX4 Dev Team. *PX4 Offboard Control Guide*. https://docs.px4.io/main/en/flight_modes/offboard.html
+20. **[ArduPilot GUIDED Mode]** ArduPilot Dev Team. *ArduCopter GUIDED Mode*. https://ardupilot.org/copter/docs/ac2_guidedmode.html
 
 21. **[MAVProxy]** ArduPilot. *MAVProxy Documentation*. https://ardupilot.org/mavproxy/
 

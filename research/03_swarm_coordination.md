@@ -37,7 +37,7 @@ small scale (3 drones, 15×60 m field, 10 minutes).
 | Aspect | Our system | Swarm-LIO2 |
 |--------|-----------|-----------|
 | Coordination | Centralised (master) | Decentralised (peer-to-peer) |
-| Localisation | PX4 EKF + GPS origin | LiDAR-Inertial Odometry |
+| Localisation | ArduPilot EKF3 + GPS origin | LiDAR-Inertial Odometry |
 | Failure mode | Master crash = mission stop | Graceful degradation |
 | Bandwidth | ~5 Hz UDP telemetry | Low-dim peer packets |
 | Complexity | Low (easy to debug) | High (needs LiDAR on each drone) |

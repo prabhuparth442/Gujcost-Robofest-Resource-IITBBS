@@ -151,7 +151,7 @@ class FlightNode(Node):
             Trigger, '/drone1/arm', self.handle_arm)
 
     def handle_arm(self, request, response):
-        # Arm the drone (using MAVSDK or px4_msgs)
+        # Arm the drone (using MAVSDK or ardupilot_msgs)
         response.success = True
         response.message = "Armed"
         return response
@@ -239,7 +239,7 @@ ros2_ws/
 ├── src/
 │   ├── drone_thermal/       ← package for thermal camera node
 │   ├── drone_detection/     ← package for vision pipeline
-│   ├── drone_flight/        ← package for MAVSDK/PX4 control
+│   ├── drone_flight/        ← package for ArduPilot/pymavlink control
 │   ├── drone_master/        ← package for master coordinator
 │   └── mine_interfaces/     ← package for custom message types
 ├── build/                   ← compiled output (auto-generated)

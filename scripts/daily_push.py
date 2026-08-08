@@ -58,7 +58,9 @@ def run(cmd, check=True, capture=False):
 
 def load_schedule():
     with open(SCHEDULE_FILE) as f:
-        return json.load(f)
+        data = json.load(f)
+    # Support both a bare list and {"days": [...]} wrapper format
+    return data["days"] if isinstance(data, dict) else data
 
 def load_state():
     if STATE_FILE.exists():
@@ -94,6 +96,23 @@ def already_tracked(files):
 
 # ── Core push logic ───────────────────────────────────────────
 
+DEVLOG = REPO_ROOT / "DEVLOG.md"
+
+def write_devlog(day_num, label, message):
+    """Append a dated entry to DEVLOG.md. Creates the file on first call."""
+    today = date.today().strftime("%Y-%m-%d")
+    entry = f"\n## Day {day_num} — {today}\n**{label}**\n\n{message}\n"
+    with open(DEVLOG, "a") as f:
+        if DEVLOG.stat().st_size == 0 if DEVLOG.exists() else True:
+            pass  # header written below on first creation
+        f.write(entry)
+
+def ensure_devlog_header():
+    if not DEVLOG.exists() or DEVLOG.stat().st_size == 0:
+        with open(DEVLOG, "w") as f:
+            f.write("# Gujcost Robofest 6.0 — Development Log\n\n"
+                    "Daily progress notes pushed incrementally to keep the repo active.\n")
+
 def push_day(batch, dry_run=False):
     """Stage and commit one batch. Returns True on success."""
     day_num  = batch["day"]
@@ -112,25 +131,41 @@ def push_day(batch, dry_run=False):
     if missing:
         print(f"  [WARN] Files not found (skipping): {missing}")
 
-    if not new_files:
-        print(f"  [SKIP] All files already committed.")
-        return True
+    # Always write a devlog entry — guarantees a real commit even when
+    # all code files are already tracked (e.g. after a bulk push).
+    ensure_devlog_header()
+    write_devlog(day_num, label, message)
+    new_files.append("DEVLOG.md")
 
     print(f"  Files to commit:")
     for f in new_files:
-        print(f"    + {f}")
+        tag = "+" if f != "DEVLOG.md" else "~"
+        print(f"    {tag} {f}")
 
     if dry_run:
         print(f"  [DRY RUN] Would commit with message:")
         print(f"    {message.splitlines()[0]}")
+        # Undo devlog write in dry-run so file isn't dirtied
+        if DEVLOG.exists():
+            lines = DEVLOG.read_text().splitlines()
+            # Remove the entry we just appended (back to last blank line before ##)
+            cut = next((i for i in range(len(lines)-1, -1, -1)
+                        if lines[i].startswith("## Day")), None)
+            if cut is not None:
+                DEVLOG.write_text("\n".join(lines[:cut]).rstrip() + "\n")
         return True
 
-    # Stage files
+    # Stage everything
     for f in new_files:
         run(f'git add "{f}"')
 
+    # Verify something is staged
+    staged_check = run("git diff --cached --quiet", check=False)
+    if staged_check.returncode == 0:
+        print(f"  [WARN] Nothing staged after add — skipping commit.")
+        return True
+
     # Commit
-    # Escape the message for shell
     escaped = message.replace('"', '\\"')
     run(f'git commit -m "{escaped}"')
     print(f"  [OK] Committed {len(new_files)} file(s)")

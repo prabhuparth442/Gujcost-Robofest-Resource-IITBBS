@@ -1,0 +1,106 @@
+{
+  "start_date": "2026-08-06",
+  "last_day_pushed": 8,
+  "push_log": [
+    {
+      "day": 1,
+      "label": "Slave orchestrator + grid map",
+      "pushed_at": "2026-08-06T14:22:14"
+    },
+    {
+      "day": 2,
+      "label": "Thermal detection filters",
+      "pushed_at": "2026-08-06T14:22:26"
+    },
+    {
+      "day": 3,
+      "label": "Coordinate math + map verifier",
+      "pushed_at": "2026-08-06T14:22:29"
+    },
+    {
+      "day": 4,
+      "label": "Comms stack (slave)",
+      "pushed_at": "2026-08-06T14:22:31"
+    },
+    {
+      "day": 4,
+      "label": "Comms stack (slave)",
+      "pushed_at": "2026-08-06T14:22:57"
+    },
+    {
+      "day": 6,
+      "label": "C++ thermal driver",
+      "pushed_at": "2026-08-06T14:24:24"
+    },
+    {
+      "day": 7,
+      "label": "Competition orchestrator + tests",
+      "pushed_at": "2026-08-06T14:29:35"
+    },
+    {
+      "day": 8,
+      "label": "Master Flask + swarm state",
+      "pushed_at": "2026-08-06T14:30:03"
+    },
+    {
+      "day": 9,
+      "label": "Master comms + config",
+      "pushed_at": "2026-08-07T13:44:32"
+    },
+    {
+      "day": 10,
+      "label": "Launch script + PS PDF",
+      "pushed_at": "2026-08-07T13:44:45"
+    },
+    {
+      "day": 9,
+      "label": "Master comms + config",
+      "pushed_at": "2026-08-07T16:21:35"
+    },
+    {
+      "day": 10,
+      "label": "Launch script + PS PDF",
+      "pushed_at": "2026-08-07T16:21:44"
+    },
+    {
+      "day": 1,
+      "label": "Slave orchestrator + grid map",
+      "pushed_at": "2026-08-07T16:22:44"
+    },
+    {
+      "day": 2,
+      "label": "Thermal detection filters",
+      "pushed_at": "2026-08-07T16:22:49"
+    },
+    {
+      "day": 3,
+      "label": "Coordinate math + map verifier",
+      "pushed_at": "2026-08-07T16:22:54"
+    },
+    {
+      "day": 4,
+      "label": "Comms stack (slave)",
+      "pushed_at": "2026-08-07T16:27:13"
+    },
+    {
+      "day": 5,
+      "label": "Slave config + preflight",
+      "pushed_at": "2026-08-07T16:27:15"
+    },
+    {
+      "day": 6,
+      "label": "C++ thermal driver",
+      "pushed_at": "2026-08-07T16:27:17"
+    },
+    {
+      "day": 7,
+      "label": "Competition orchestrator + tests",
+      "pushed_at": "2026-08-07T16:27:20"
+    },
+    {
+      "day": 8,
+      "label": "Master Flask + swarm state",
+      "pushed_at": "2026-08-07T16:27:23"
+    }
+  ]
+}

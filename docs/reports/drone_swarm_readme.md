@@ -158,7 +158,7 @@ if __name__ == "__main__":
 - Python 3.7+
 - MAVSDK-Python (`pip install mavsdk`)
 - MAVProxy (`pip install MAVProxy`)
-- ArduPilot or PX4 firmware on flight controllers
+- ArduPilot firmware on flight controllers (SpeedyBee F405)
 
 ---
 
